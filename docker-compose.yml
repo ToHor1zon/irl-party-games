@@ -1,0 +1,15 @@
+services:
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      JWT_SECRET: ${JWT_SECRET:?Задай JWT_SECRET в .env}
+      TZ_OFFSET_HOURS: ${TZ_OFFSET_HOURS:-8}
+      PORT: 3000
+    volumes:
+      - quest-data:/app/data
+    restart: unless-stopped
+
+volumes:
+  quest-data:

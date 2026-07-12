@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "china-quest",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": ["-c", "cd server && JWT_SECRET=local-test-secret PORT=3100 node src/index.js"],
+      "port": 3100
+    }
+  ]
+}
