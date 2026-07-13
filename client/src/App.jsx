@@ -135,7 +135,7 @@ function Main({ user }) {
         <span className="topbar-user">{user.name}</span>
       </header>
       <main className="content">
-        {tab === 'today' && <TodayTab today={today} hunt={hunt} act={act} />}
+        {tab === 'today' && <TodayTab today={today} hunt={hunt} chain={chain} act={act} />}
         {tab === 'photos' && <PhotosTab gallery={gallery} act={act} />}
         {tab === 'bingo' && <BingoTab bingo={bingo} act={act} />}
         {tab === 'chain' && <ChainTab chain={chain} act={act} />}
@@ -175,7 +175,7 @@ function FileButton({ label, onFile, className = 'btn btn-primary' }) {
   );
 }
 
-function TodayTab({ today, hunt, act }) {
+function TodayTab({ today, hunt, chain, act }) {
   if (!today) return <div className="loading">Зажигаем фонари…</div>;
 
   const uploadPhoto = (file) => {
@@ -192,7 +192,7 @@ function TodayTab({ today, hunt, act }) {
   };
 
   return (
-    <div className="stack">
+    <div className="stack today-stack">
       <section className="ticket ticket-lantern">
         <div className="ticket-tag">Фото-миссия дня · сдал +5 · голос за твоё +7</div>
         <h2>{today.mission}</h2>
@@ -232,6 +232,17 @@ function TodayTab({ today, hunt, act }) {
               )}
             </div>
           ))}
+        </section>
+      )}
+
+      {chain?.enabled && (
+        <section className="ticket ticket-brass chain-preview">
+          <div className="ticket-tag">Цепочка чисел · сейчас ищем {chain.next}</div>
+          {chain.lastEntry ? (
+            <LastChainEntry entry={chain.lastEntry} />
+          ) : (
+            <p className="hint">Цепочка ещё не началась — первым нужно найти число 1.</p>
+          )}
         </section>
       )}
     </div>
@@ -294,6 +305,7 @@ function ChainTab({ chain, act }) {
           <FileButton label={`📸 Я нашёл ${chain.next}! (+${chain.points})`} onFile={upload} />
         )}
         {chain.lastFinder && <p className="hint">Прошлое число забрал(а): {chain.lastFinder.name}</p>}
+        {chain.lastEntry && <LastChainEntry entry={chain.lastEntry} />}
       </section>
 
       {chain.entries.length > 0 && (
@@ -310,6 +322,18 @@ function ChainTab({ chain, act }) {
         </>
       )}
     </div>
+  );
+}
+
+function LastChainEntry({ entry }) {
+  return (
+    <figure className="chain-latest">
+      <div className="chain-latest-photo">
+        <img src={entry.url} alt={`Последнее найденное число ${entry.n}`} loading="lazy" />
+        <span className="chain-latest-number">{entry.n}</span>
+      </div>
+      <figcaption>Последним нашёл(ла): {entry.name}</figcaption>
+    </figure>
   );
 }
 
@@ -470,6 +494,16 @@ function AdminTab({ notify }) {
   return (
     <div className="stack">
       <h2 className="page-title">Админка</h2>
+      <PoolEditor
+        tag={`Фотомиссия дня — тем в пуле: ${cfg.photo.missions.length}`}
+        items={cfg.photo.missions}
+        busy={busy}
+        placeholder="Тема для фотомиссии дня"
+        warning={cfg.photo.missions.length < 2 ? 'Лучше добавить хотя бы две темы, чтобы миссии менялись.' : null}
+        note="Миссия на сегодня уже выбрана. Изменения пула подействуют со следующего игрового дня."
+        onSave={(missions) => save({ photo: { ...cfg.photo, missions } })}
+        notify={notify}
+      />
       <PoolEditor
         tag={`Бинго — слов в пуле: ${cfg.bingo.words.length} · нужно минимум 25`}
         items={cfg.bingo.words}

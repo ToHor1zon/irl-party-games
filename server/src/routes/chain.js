@@ -13,7 +13,7 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 
 function chainState(meId) {
   const cfg = getConfig();
   const last = db.prepare(`
-    SELECT c.n, c.user_id, u.name FROM chain_entries c
+    SELECT c.n, c.user_id, u.name, c.filename FROM chain_entries c
     JOIN users u ON u.id = c.user_id ORDER BY c.n DESC LIMIT 1
   `).get();
   const next = (last?.n ?? 0) + 1;
@@ -23,6 +23,12 @@ function chainState(meId) {
     next,
     points: Math.min(next, cfg.chain.maxPoints),
     lastFinder: last ? { userId: last.user_id, name: last.name } : null,
+    lastEntry: last ? {
+      n: last.n,
+      userId: last.user_id,
+      name: last.name,
+      url: `/uploads/${last.filename}`,
+    } : null,
     mustSkip: last ? last.user_id === meId : false, // нашедший прошлое число пропускает ход
   };
 }
