@@ -80,11 +80,6 @@ img { display: block; max-width: 100%; }
 .ticket h2 { font-size: 19px; line-height: 1.35; margin-bottom: 14px; }
 .ticket h3 { font-size: 16px; line-height: 1.4; margin-bottom: 8px; }
 
-.drama {
-  border-top-color: var(--lantern);
-  background: linear-gradient(135deg, rgba(255, 68, 56, 0.16), var(--card) 55%);
-}
-
 /* ── Кнопки ─────────────────────────────────────────────────── */
 .btn {
   display: inline-block;
@@ -118,46 +113,6 @@ img { display: block; max-width: 100%; }
 }
 .btn-vote.voted { background: var(--jade); color: #0B2C1F; }
 
-/* ── Flip-карта (скрытое слово / роль) ──────────────────────── */
-.flip { perspective: 900px; cursor: pointer; margin: 6px 0 10px; user-select: none; }
-.flip-inner {
-  position: relative;
-  height: 120px;
-  transition: transform 0.5s cubic-bezier(0.4, 0.1, 0.2, 1);
-  transform-style: preserve-3d;
-}
-.flip.flipped .flip-inner { transform: rotateY(180deg); }
-.flip-face {
-  position: absolute; inset: 0;
-  display: flex; align-items: center; justify-content: center;
-  text-align: center;
-  border-radius: 12px;
-  padding: 14px;
-  backface-visibility: hidden;
-  -webkit-backface-visibility: hidden;
-}
-.flip-front {
-  background: repeating-linear-gradient(
-    -45deg,
-    rgba(255, 197, 61, 0.08) 0 12px,
-    rgba(255, 197, 61, 0.03) 12px 24px
-  ), rgba(0, 0, 0, 0.25);
-  border: 1px dashed rgba(255, 197, 61, 0.4);
-  color: var(--muted);
-  font-size: 14px; line-height: 1.5;
-}
-.flip-back {
-  transform: rotateY(180deg);
-  background: linear-gradient(160deg, #2A1E4A, #1F1636);
-  border: 1px solid rgba(255, 197, 61, 0.35);
-}
-.secret-word { font-size: 24px; font-weight: 800; color: var(--brass); letter-spacing: 0.5px; }
-.imposter-role {
-  font-size: 22px; font-weight: 900; color: var(--lantern);
-  letter-spacing: 1px; line-height: 1.4;
-}
-.imposter-role small, .flip-front small { display: block; font-size: 12px; font-weight: 400; color: var(--muted); margin-top: 4px; }
-
 /* ── Галерея фото ───────────────────────────────────────────── */
 .photo-card {
   background: var(--card);
@@ -188,6 +143,104 @@ img { display: block; max-width: 100%; }
 .chain-card img { width: 100%; height: 110px; object-fit: cover; }
 .chain-card figcaption { padding: 8px 10px; font-size: 12px; color: var(--muted); }
 .chain-card b { color: var(--brass); font-size: 14px; }
+
+/* ── Фотоохота ──────────────────────────────────────────────── */
+.hunt-item { padding: 12px 0; }
+.hunt-item:not(:last-child) { border-bottom: 1px dashed rgba(243, 236, 220, 0.15); }
+.hunt-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.hunt-text { flex: 1; font-weight: 700; font-size: 15px; line-height: 1.35; }
+.hunt-done { color: var(--jade); font-weight: 800; white-space: nowrap; }
+.hunt-head .btn-small { white-space: nowrap; }
+.hunt-finds { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.hunt-find { width: 72px; }
+.hunt-find img { width: 72px; height: 72px; object-fit: cover; border-radius: 8px; }
+.hunt-find figcaption {
+  font-size: 10px; color: var(--muted); text-align: center; margin-top: 3px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* ── Бинго ──────────────────────────────────────────────────── */
+.bingo-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+  margin: 12px 0 4px;
+}
+.bingo-cell {
+  display: flex; align-items: center; justify-content: center;
+  min-height: 58px;
+  padding: 4px 3px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(243, 236, 220, 0.18);
+  border-radius: 8px;
+  font-size: 10px; font-weight: 700; line-height: 1.2;
+  text-align: center;
+  overflow-wrap: break-word; word-break: break-word;
+  cursor: pointer;
+  transition: transform 0.06s ease, background 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.bingo-cell:active { transform: scale(0.94); }
+.bingo-cell.marked {
+  background: rgba(59, 227, 167, 0.22);
+  border-color: var(--jade);
+  color: var(--jade);
+  text-decoration: line-through;
+}
+
+/* ── Модалка подтверждения ──────────────────────────────────── */
+.modal-backdrop {
+  position: fixed; inset: 0; z-index: 30;
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+  background: rgba(10, 6, 20, 0.65);
+  backdrop-filter: blur(3px);
+}
+.modal {
+  width: 100%; max-width: 340px;
+  background: var(--card);
+  border-radius: 14px;
+  border-top: 4px solid var(--brass);
+  padding: 20px;
+  box-shadow: var(--shadow);
+  animation: toast-in 0.2s ease;
+}
+.modal h3 { margin-bottom: 8px; }
+.modal-text { font-size: 14px; color: var(--muted); line-height: 1.5; margin-bottom: 14px; }
+
+/* ── Админка ────────────────────────────────────────────────── */
+.admin-add { display: flex; gap: 8px; margin-bottom: 12px; }
+.admin-add input {
+  flex: 1; min-width: 0;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(243, 236, 220, 0.2);
+  border-radius: 10px;
+  padding: 12px 14px;
+  color: var(--text); font-size: 15px;
+  outline: none;
+}
+.admin-add input:focus { border-color: var(--brass); }
+.admin-add .btn { flex: none; }
+.admin-words { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+.admin-word {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: rgba(255, 197, 61, 0.12);
+  border: 1px solid rgba(255, 197, 61, 0.3);
+  color: var(--brass);
+  border-radius: 999px;
+  padding: 6px 6px 6px 12px;
+  font-size: 13px; font-weight: 600;
+}
+.admin-word-x {
+  display: flex; align-items: center; justify-content: center;
+  width: 20px; height: 20px;
+  background: rgba(255, 68, 56, 0.18);
+  border: none; border-radius: 50%;
+  color: var(--lantern);
+  font-size: 14px; line-height: 1;
+  cursor: pointer;
+}
+.admin-word-x:disabled { opacity: 0.4; cursor: default; }
 
 /* ── Лидерборд ──────────────────────────────────────────────── */
 .lb-row {

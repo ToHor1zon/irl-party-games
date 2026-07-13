@@ -4,11 +4,12 @@ import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { UPLOADS_DIR } from './db.js';
 import { requireAuth, requireAdmin } from './auth.js';
-import { closePastDays } from './daily.js';
 import authRouter from './routes/auth.js';
 import dayRouter from './routes/day.js';
 import photosRouter from './routes/photos.js';
 import chainRouter from './routes/chain.js';
+import bingoRouter from './routes/bingo.js';
+import huntRouter from './routes/hunt.js';
 import metaRouter from './routes/meta.js';
 import adminRouter from './routes/admin.js';
 
@@ -28,6 +29,8 @@ app.use('/api/admin', requireAdmin, adminRouter);
 app.use('/api/day', dayRouter);
 app.use('/api/photos', photosRouter);
 app.use('/api/chain', chainRouter);
+app.use('/api/bingo', bingoRouter);
+app.use('/api/hunt', huntRouter);
 app.use('/api', metaRouter);
 
 app.use('/uploads', express.static(UPLOADS_DIR, { maxAge: '30d', immutable: true }));
@@ -44,10 +47,6 @@ app.use((err, req, res, next) => {
   console.error(err);
   res.status(500).json({ error: 'Что-то пошло не так на сервере' });
 });
-
-// Прошедшие дни закрываются при первом запросе нового дня + фоном раз в 10 минут.
-setInterval(closePastDays, 10 * 60 * 1000);
-closePastDays();
 
 app.listen(PORT, () => {
   console.log(`🏮 Китай-Квест запущен: http://localhost:${PORT}${clientDist ? '' : ' (клиент не собран — только API)'}`);

@@ -1,5 +1,6 @@
 import { db } from './db.js';
 import { getConfig } from './config.js';
+import { cardScore } from './bingo.js';
 
 // Очки считаются на лету из исходных таблиц — без леджера.
 // Стоимость каждого действия берётся из конфига админки, поэтому смена очков
@@ -16,22 +17,15 @@ export function leaderboard() {
   for (const r of db.prepare('SELECT photo_user_id FROM photo_votes').all())
     add(r.photo_user_id, cfg.photo.votePoints);
 
-  for (const r of db.prepare("SELECT user_id FROM word_statuses WHERE status = 'done'").all())
-    add(r.user_id, cfg.word.points);
-
-  for (const r of db.prepare(`
-    SELECT imposter_user_id AS id FROM days
-    WHERE closed = 1 AND imposter_caught = 0 AND imposter_user_id IS NOT NULL
-  `).all()) add(r.id, cfg.imposter.survivePoints);
-
-  for (const r of db.prepare(`
-    SELECT iv.voter_id AS id FROM imposter_votes iv
-    JOIN days d ON d.date = iv.date
-    WHERE d.closed = 1 AND iv.target_user_id = d.imposter_user_id
-  `).all()) add(r.id, cfg.imposter.guessPoints);
-
   for (const r of db.prepare('SELECT n, user_id FROM chain_entries').all())
     add(r.user_id, Math.min(r.n, cfg.chain.maxPoints));
+
+  for (const r of db.prepare('SELECT user_id, COUNT(*) AS c FROM hunt_photos GROUP BY user_id').all())
+    add(r.user_id, r.c * cfg.hunt.itemPoints);
+
+  for (const r of db.prepare('SELECT user_id, marks FROM bingo_cards').all()) {
+    try { add(r.user_id, cardScore(JSON.parse(r.marks), cfg.bingo)); } catch { /* битая строка не валит топ */ }
+  }
 
   return users
     .map((u) => ({ id: u.id, name: u.name, score: scores.get(u.id) }))

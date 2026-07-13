@@ -4,9 +4,11 @@ import { api, getToken, setToken } from './api.js';
 const TABS = [
   { id: 'today', label: 'Сегодня', icon: '🏮' },
   { id: 'photos', label: 'Фото', icon: '📸' },
+  { id: 'bingo', label: 'Бинго', icon: '🎯' },
   { id: 'chain', label: 'Цепочка', icon: '🔢' },
   { id: 'top', label: 'Топ', icon: '🏆' },
 ];
+const ADMIN_TAB = { id: 'admin', label: 'Админ', icon: '⚙️' };
 
 export default function App() {
   const [booted, setBooted] = useState(false);
@@ -86,6 +88,8 @@ function Main({ user }) {
   const [today, setToday] = useState(null);
   const [gallery, setGallery] = useState(null);
   const [chain, setChain] = useState(null);
+  const [bingo, setBingo] = useState(null);
+  const [hunt, setHunt] = useState(null);
   const [top, setTop] = useState(null);
   const [players, setPlayers] = useState([]);
   const [toast, setToast] = useState(null);
@@ -99,10 +103,10 @@ function Main({ user }) {
 
   const refresh = useCallback(async () => {
     try {
-      const [t, g, c, l, p] = await Promise.all([
-        api('/day/today'), api('/photos/today'), api('/chain'), api('/leaderboard'), api('/players'),
+      const [t, g, c, b, h, l, p] = await Promise.all([
+        api('/day/today'), api('/photos/today'), api('/chain'), api('/bingo'), api('/hunt'), api('/leaderboard'), api('/players'),
       ]);
-      setToday(t); setGallery(g); setChain(c); setTop(l.leaderboard); setPlayers(p.players);
+      setToday(t); setGallery(g); setChain(c); setBingo(b); setHunt(h); setTop(l.leaderboard); setPlayers(p.players);
     } catch {
       // тихо: поллинг повторит через 30 секунд
     }
@@ -131,14 +135,16 @@ function Main({ user }) {
         <span className="topbar-user">{user.name}</span>
       </header>
       <main className="content">
-        {tab === 'today' && <TodayTab today={today} user={user} players={players} act={act} />}
+        {tab === 'today' && <TodayTab today={today} hunt={hunt} act={act} />}
         {tab === 'photos' && <PhotosTab gallery={gallery} act={act} />}
+        {tab === 'bingo' && <BingoTab bingo={bingo} act={act} />}
         {tab === 'chain' && <ChainTab chain={chain} act={act} />}
         {tab === 'top' && <TopTab top={top} user={user} />}
+        {tab === 'admin' && <AdminTab notify={notify} />}
       </main>
       {toast && <div className="toast">{toast}</div>}
       <nav className="tabbar">
-        {TABS.map((t) => (
+        {(user.isAdmin ? [...TABS, ADMIN_TAB] : TABS).map((t) => (
           <button key={t.id} className={tab === t.id ? 'tab active' : 'tab'} onClick={() => setTab(t.id)}>
             <span className="tab-icon">{t.icon}</span>
             {t.label}
@@ -149,11 +155,11 @@ function Main({ user }) {
   );
 }
 
-function FileButton({ label, onFile }) {
+function FileButton({ label, onFile, className = 'btn btn-primary' }) {
   const ref = useRef(null);
   return (
     <>
-      <button className="btn btn-primary" onClick={() => ref.current?.click()}>{label}</button>
+      <button className={className} onClick={() => ref.current?.click()}>{label}</button>
       <input
         ref={ref}
         type="file"
@@ -169,40 +175,8 @@ function FileButton({ label, onFile }) {
   );
 }
 
-function FlipCard({ front, back }) {
-  const [flipped, setFlipped] = useState(false);
-  return (
-    <div
-      className={flipped ? 'flip flipped' : 'flip'}
-      onClick={() => setFlipped(!flipped)}
-      role="button"
-      aria-label="Перевернуть карту"
-    >
-      <div className="flip-inner">
-        <div className="flip-face flip-front">{front}</div>
-        <div className="flip-face flip-back">{back}</div>
-      </div>
-    </div>
-  );
-}
-
-function Drama({ y }) {
-  return (
-    <section className="ticket drama">
-      <div className="ticket-tag">Вчерашняя драма · {y.date}</div>
-      <h3>
-        {y.caught
-          ? `🚨 Импостером был(а) ${y.imposterName} — и вы его вычислили!`
-          : `😈 Импостером был(а) ${y.imposterName} — и ушёл сухим из воды (+30)`}
-      </h3>
-      <p>Слово дня было: <b>«{y.word}»</b></p>
-    </section>
-  );
-}
-
-function TodayTab({ today, user, players, act }) {
+function TodayTab({ today, hunt, act }) {
   if (!today) return <div className="loading">Зажигаем фонари…</div>;
-  const others = players.filter((p) => p.id !== user.id);
 
   const uploadPhoto = (file) => {
     const fd = new FormData();
@@ -210,10 +184,15 @@ function TodayTab({ today, user, players, act }) {
     act(() => api('/photos', { method: 'POST', formData: fd }), 'Фото сдано! +5 очков');
   };
 
+  const uploadHunt = (idx) => (file) => {
+    const fd = new FormData();
+    fd.append('photo', file);
+    fd.append('item', String(idx));
+    act(() => api('/hunt', { method: 'POST', formData: fd }), `🎯 Добыча засчитана! +${hunt.itemPoints}`);
+  };
+
   return (
     <div className="stack">
-      {today.yesterday && <Drama y={today.yesterday} />}
-
       <section className="ticket ticket-lantern">
         <div className="ticket-tag">Фото-миссия дня · сдал +5 · голос за твоё +7</div>
         <h2>{today.mission}</h2>
@@ -225,69 +204,36 @@ function TodayTab({ today, user, players, act }) {
         <p className="hint">Сдано сегодня: {today.photo.count}. Голосование — во вкладке «Фото».</p>
       </section>
 
-      <section className="ticket ticket-brass">
-        <div className="ticket-tag">Тайное слово · выполнил +15</div>
-        <FlipCard
-          front={<span>🤫 Тапни, чтобы подсмотреть слово<br /><small>убедись, что соседи не палят</small></span>}
-          back={<span className="secret-word">{today.word.word}</span>}
-        />
-        <p className="hint">Вставь это слово в разговор 5 раз за день — и не спались.</p>
-        {today.word.status ? (
-          <div className="done-line">
-            {today.word.status === 'done'
-              ? '✓ Заявлено: сказал 5 раз. Верим на слово. +15'
-              : '✗ Спалили. Честность — тоже добродетель.'}
-          </div>
-        ) : (
-          <div className="btn-row">
-            <button
-              className="btn btn-jade"
-              onClick={() => act(() => api('/day/word', { method: 'POST', body: { status: 'done' } }), '+15! Мастер разговорного жанра')}
-            >
-              Сказал 5 раз ✓
-            </button>
-            <button
-              className="btn btn-ghost"
-              onClick={() => act(() => api('/day/word', { method: 'POST', body: { status: 'busted' } }), 'Записали. Бывает.')}
-            >
-              Меня спалили ✗
-            </button>
-          </div>
-        )}
-      </section>
-
-      <section className="ticket ticket-jade">
-        <div className="ticket-tag">Imposter Who? · выжил +30 · угадал +10</div>
-        {!today.imposter.active ? (
-          <p>Импостер сегодня спит: нужно минимум {today.imposter.minPlayers} игрока (сейчас {today.playersCount}).</p>
-        ) : (
-          <>
-            <FlipCard
-              front={<span>🎭 Тапни, чтобы узнать свою роль</span>}
-              back={
-                today.imposter.isImposter ? (
-                  <span className="imposter-role">ТЫ ИМПОСТЕР<br /><small>не спались и пойми слово по намёкам</small></span>
+      {hunt?.enabled && hunt.items.length > 0 && (
+        <section className="ticket ticket-jade">
+          <div className="ticket-tag">Фотоохота дня · каждая цель +{hunt.itemPoints}</div>
+          <p className="hint">
+            Это не конкурс красоты — просто найди и докажи фоткой. Три цели на сегодня:
+          </p>
+          {hunt.items.map((it) => (
+            <div key={it.idx} className="hunt-item">
+              <div className="hunt-head">
+                <span className="hunt-text">{it.text}</span>
+                {it.myUrl ? (
+                  <span className="hunt-done">✓ добыто</span>
                 ) : (
-                  <span className="secret-word">{today.imposter.word}</span>
-                )
-              }
-            />
-            <p className="hint">Обсуждайте слово намёками вживую. Кто сегодня подозрительно молчит?</p>
-            <div className="vote-grid">
-              {others.map((p) => (
-                <button
-                  key={p.id}
-                  className={today.imposter.myVoteUserId === p.id ? 'btn btn-vote voted' : 'btn btn-vote'}
-                  onClick={() => act(() => api('/day/vote-imposter', { method: 'POST', body: { targetUserId: p.id } }), `Подозрение пало на: ${p.name}`)}
-                >
-                  {today.imposter.myVoteUserId === p.id ? '👉 ' : ''}{p.name}
-                </button>
-              ))}
+                  <FileButton className="btn btn-small" label="📸 Нашёл!" onFile={uploadHunt(it.idx)} />
+                )}
+              </div>
+              {it.finds.length > 0 && (
+                <div className="hunt-finds">
+                  {it.finds.map((f) => (
+                    <figure key={f.userId} className="hunt-find">
+                      <img src={f.url} alt={`Находка от ${f.name}`} loading="lazy" />
+                      <figcaption>{f.name}</figcaption>
+                    </figure>
+                  ))}
+                </div>
+              )}
             </div>
-            <p className="hint">Голосов сегодня: {today.imposter.votesTotal}. Итоги — завтра утром, с драмой.</p>
-          </>
-        )}
-      </section>
+          ))}
+        </section>
+      )}
     </div>
   );
 }
@@ -367,6 +313,187 @@ function ChainTab({ chain, act }) {
   );
 }
 
+function ConfirmModal({ title, text, confirmLabel, onConfirm, onCancel }) {
+  return (
+    <div className="modal-backdrop" onClick={onCancel}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <h3>{title}</h3>
+        <p className="modal-text">{text}</p>
+        <div className="btn-row">
+          <button className="btn btn-jade" onClick={onConfirm}>{confirmLabel}</button>
+          <button className="btn btn-ghost" onClick={onCancel}>Отмена</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function BingoTab({ bingo, act }) {
+  // Любое изменение клетки — только через подтверждение в модалке.
+  const [confirm, setConfirm] = useState(null); // { cell, word, marked }
+
+  if (!bingo) return <div className="loading">Раздаём карточки…</div>;
+  if (!bingo.enabled) {
+    return (
+      <div className="empty">
+        <div className="empty-icon">🎯</div>
+        <p>Бинго выключено админом.</p>
+      </div>
+    );
+  }
+
+  const apply = () => {
+    const { cell, marked } = confirm;
+    setConfirm(null);
+    act(
+      () => api('/bingo/mark', { method: 'POST', body: { cell, marked: !marked } }),
+      marked ? 'Отметка снята' : '🎯 Есть! Клетка отмечена',
+    );
+  };
+
+  return (
+    <div className="stack">
+      <section className="ticket ticket-jade">
+        <div className="ticket-tag">
+          Бинго дня · клетка +{bingo.cellPoints} · линия +{bingo.linePoints} · вся карта +{bingo.cardPoints}
+        </div>
+        <p className="hint">
+          Увидел слово на вывеске или услышал от посторонних (наши не считаются!) — тапни клетку.
+          Линия — 5 в ряд по горизонтали, вертикали или диагонали.
+        </p>
+        <div className="bingo-grid">
+          {bingo.cells.map((c, i) => (
+            <button
+              key={i}
+              className={c.marked ? 'bingo-cell marked' : 'bingo-cell'}
+              onClick={() => setConfirm({ cell: i, word: c.word, marked: c.marked })}
+            >
+              {c.word}
+            </button>
+          ))}
+        </div>
+        <p className="hint center">
+          Отмечено {bingo.marked}/25 · линий {bingo.lines} · очков за карту {bingo.score}
+        </p>
+      </section>
+
+      {confirm && (
+        <ConfirmModal
+          title={confirm.marked ? 'Сбросить отметку?' : 'Отметить клетку?'}
+          text={confirm.marked
+            ? `Снимаем отметку с «${confirm.word}» — очки за неё уйдут.`
+            : `«${confirm.word}» — правда видел или слышал от посторонних? Честность — валюта этой игры.`}
+          confirmLabel={confirm.marked ? 'Да, сбросить' : 'Да, подтверждаю'}
+          onConfirm={apply}
+          onCancel={() => setConfirm(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+// Общий редактор пула: добавление и удаление позиций, каждое изменение
+// сразу сохраняется целым конфигом (так работает PUT /admin/config).
+function PoolEditor({ tag, items, busy, placeholder, warning, note, onSave, notify }) {
+  const [value, setValue] = useState('');
+
+  const add = (e) => {
+    e.preventDefault();
+    const w = value.trim();
+    if (!w) return;
+    if (items.some((x) => x.toLowerCase() === w.toLowerCase()))
+      return notify('Такое уже есть в пуле');
+    setValue('');
+    onSave([...items, w]);
+  };
+
+  return (
+    <section className="ticket ticket-brass">
+      <div className="ticket-tag">{tag}</div>
+      <form onSubmit={add} className="admin-add">
+        <input
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          placeholder={placeholder}
+          maxLength={80}
+        />
+        <button className="btn btn-jade" disabled={busy || !value.trim()}>Добавить</button>
+      </form>
+      {warning && <p className="hint">⚠️ {warning}</p>}
+      <div className="admin-words">
+        {items.map((w) => (
+          <span key={w} className="admin-word">
+            {w}
+            <button
+              className="admin-word-x"
+              disabled={busy}
+              onClick={() => onSave(items.filter((x) => x !== w))}
+              aria-label={`Удалить ${w}`}
+            >
+              ×
+            </button>
+          </span>
+        ))}
+      </div>
+      {note && <p className="hint">{note}</p>}
+    </section>
+  );
+}
+
+function AdminTab({ notify }) {
+  const [cfg, setCfg] = useState(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    api('/admin/config')
+      .then((d) => setCfg(d.config))
+      .catch((e) => notify(e.message));
+  }, [notify]);
+
+  if (!cfg) return <div className="loading">Открываем кабинет…</div>;
+
+  const save = async (patch) => {
+    setBusy(true);
+    try {
+      const d = await api('/admin/config', {
+        method: 'PUT',
+        body: { config: { ...cfg, ...patch } },
+      });
+      setCfg(d.config);
+    } catch (e) {
+      notify(e.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="stack">
+      <h2 className="page-title">Админка</h2>
+      <PoolEditor
+        tag={`Бинго — слов в пуле: ${cfg.bingo.words.length} · нужно минимум 25`}
+        items={cfg.bingo.words}
+        busy={busy}
+        placeholder="Слово или словосочетание"
+        warning={cfg.bingo.words.length < 25 ? 'Слов меньше 25 — в карточках будут повторы.' : null}
+        note="Изменения пула действуют на карточки, выданные после правки. Уже розданные карточки дня не меняются."
+        onSave={(words) => save({ bingo: { ...cfg.bingo, words } })}
+        notify={notify}
+      />
+      <PoolEditor
+        tag={`Фотоохота — целей в пуле: ${cfg.hunt.items.length} · по 3 в день`}
+        items={cfg.hunt.items}
+        busy={busy}
+        placeholder="Стёбная цель для охоты"
+        warning={cfg.hunt.items.length < 3 ? 'Нужно минимум 3 цели, иначе список дня будет короче.' : null}
+        note="Сегодняшний список уже зафиксирован — правки пула подействуют со следующего дня."
+        onSave={(items) => save({ hunt: { ...cfg.hunt, items } })}
+        notify={notify}
+      />
+    </div>
+  );
+}
+
 function TopTab({ top, user }) {
   if (!top) return <div className="loading">Пересчитываем славу…</div>;
   const medals = ['🥇', '🥈', '🥉'];
@@ -384,7 +511,7 @@ function TopTab({ top, user }) {
         {top.length === 0 && <p className="hint">Пока пусто. Позови банду.</p>}
       </section>
       <p className="hint center">
-        фото +5 · голос за твоё фото +7 · слово +15 · импостер выжил +30 · угадал импостера +10 · число N +N (до 30)
+        фото +5 · голос за твоё фото +7 · число N +N (до 30) · охота: цель +8 · бинго: клетка +2, линия +10, вся карта +40
       </p>
     </div>
   );

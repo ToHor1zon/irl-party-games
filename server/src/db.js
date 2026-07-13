@@ -21,10 +21,7 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS days (
   date TEXT PRIMARY KEY,
   mission_idx INTEGER NOT NULL,
-  imposter_user_id INTEGER REFERENCES users(id),
-  imposter_word_idx INTEGER NOT NULL,
-  closed INTEGER NOT NULL DEFAULT 0,
-  imposter_caught INTEGER
+  hunt_items TEXT
 );
 
 CREATE TABLE IF NOT EXISTS photos (
@@ -43,20 +40,6 @@ CREATE TABLE IF NOT EXISTS photo_votes (
   PRIMARY KEY (date, voter_id)
 );
 
-CREATE TABLE IF NOT EXISTS word_statuses (
-  date TEXT NOT NULL,
-  user_id INTEGER NOT NULL REFERENCES users(id),
-  status TEXT NOT NULL CHECK (status IN ('done', 'busted')),
-  PRIMARY KEY (date, user_id)
-);
-
-CREATE TABLE IF NOT EXISTS imposter_votes (
-  date TEXT NOT NULL,
-  voter_id INTEGER NOT NULL REFERENCES users(id),
-  target_user_id INTEGER NOT NULL REFERENCES users(id),
-  PRIMARY KEY (date, voter_id)
-);
-
 -- n — PRIMARY KEY: гонку «кто первый нашёл число» решает сама база.
 CREATE TABLE IF NOT EXISTS chain_entries (
   n INTEGER PRIMARY KEY,
@@ -64,6 +47,26 @@ CREATE TABLE IF NOT EXISTS chain_entries (
   date TEXT NOT NULL,
   filename TEXT NOT NULL,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Бинго: карточка дня фиксируется при первом запросе (words — JSON из 25 слов),
+-- отметки — JSON из 25 нулей/единиц. Правки пула не меняют выданные карточки.
+CREATE TABLE IF NOT EXISTS bingo_cards (
+  date TEXT NOT NULL,
+  user_id INTEGER NOT NULL REFERENCES users(id),
+  words TEXT NOT NULL,
+  marks TEXT NOT NULL,
+  PRIMARY KEY (date, user_id)
+);
+
+-- Фотоохота: одно фото-доказательство на цель дня с игрока.
+CREATE TABLE IF NOT EXISTS hunt_photos (
+  date TEXT NOT NULL,
+  user_id INTEGER NOT NULL REFERENCES users(id),
+  item_idx INTEGER NOT NULL,
+  filename TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (date, user_id, item_idx)
 );
 
 -- Конфиг игр из админки: одна строка JSON поверх дефолтов из content.js.
@@ -84,3 +87,23 @@ db.exec(`
   WHERE id = (SELECT MIN(id) FROM users)
     AND NOT EXISTS (SELECT 1 FROM users WHERE is_admin = 1)
 `);
+
+// Миграция после удаления игр «Тайное слово» и «Imposter Who?»:
+// их таблицы сносятся, days сужается до (date, mission_idx).
+db.exec('DROP TABLE IF EXISTS word_statuses');
+db.exec('DROP TABLE IF EXISTS imposter_votes');
+const dayCols = db.prepare('PRAGMA table_info(days)').all();
+if (dayCols.some((c) => c.name === 'imposter_user_id')) {
+  db.exec(`
+    CREATE TABLE days_new (date TEXT PRIMARY KEY, mission_idx INTEGER NOT NULL);
+    INSERT INTO days_new SELECT date, mission_idx FROM days;
+    DROP TABLE days;
+    ALTER TABLE days_new RENAME TO days;
+  `);
+}
+
+// Фотоохота: цели дня фиксируются в days.hunt_items (JSON из 3 строк).
+const dayColsAfter = db.prepare('PRAGMA table_info(days)').all();
+if (!dayColsAfter.some((c) => c.name === 'hunt_items')) {
+  db.exec('ALTER TABLE days ADD COLUMN hunt_items TEXT');
+}
