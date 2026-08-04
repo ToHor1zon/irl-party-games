@@ -8,6 +8,7 @@ export const DEFAULT_CONFIG = {
   chain: { enabled: true, maxPoints: 30 },
   bingo: { enabled: true, cellPoints: 2, linePoints: 10, cardPoints: 40, words: BINGO_WORDS },
   hunt: { enabled: true, itemPoints: 8, items: HUNT_ITEMS },
+  phrase: { enabled: true, wordPoints: 3, photoPoints: 12 },
 };
 
 let cache = null;
@@ -47,6 +48,11 @@ function normalize(raw) {
       enabled: bool(r.hunt?.enabled, d.hunt.enabled),
       itemPoints: num(r.hunt?.itemPoints, d.hunt.itemPoints),
       items: list(r.hunt?.items, d.hunt.items),
+    },
+    phrase: {
+      enabled: bool(r.phrase?.enabled, d.phrase.enabled),
+      wordPoints: num(r.phrase?.wordPoints, d.phrase.wordPoints),
+      photoPoints: num(r.phrase?.photoPoints, d.phrase.photoPoints),
     },
   };
 }

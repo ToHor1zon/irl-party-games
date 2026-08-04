@@ -6,6 +6,7 @@ const TABS = [
   { id: 'photos', label: 'Фото', icon: '📸' },
   { id: 'bingo', label: 'Бинго', icon: '🎯' },
   { id: 'chain', label: 'Цепочка', icon: '🔢' },
+  { id: 'phrase', label: 'Фразы', icon: '🎭' },
   { id: 'top', label: 'Топ', icon: '🏆' },
 ];
 const ADMIN_TAB = { id: 'admin', label: 'Админ', icon: '⚙️' };
@@ -90,6 +91,7 @@ function Main({ user }) {
   const [chain, setChain] = useState(null);
   const [bingo, setBingo] = useState(null);
   const [hunt, setHunt] = useState(null);
+  const [phrase, setPhrase] = useState(null);
   const [top, setTop] = useState(null);
   const [players, setPlayers] = useState([]);
   const [toast, setToast] = useState(null);
@@ -103,10 +105,10 @@ function Main({ user }) {
 
   const refresh = useCallback(async () => {
     try {
-      const [t, g, c, b, h, l, p] = await Promise.all([
-        api('/day/today'), api('/photos/today'), api('/chain'), api('/bingo'), api('/hunt'), api('/leaderboard'), api('/players'),
+      const [t, g, c, b, h, f, l, p] = await Promise.all([
+        api('/day/today'), api('/photos/today'), api('/chain'), api('/bingo'), api('/hunt'), api('/phrase'), api('/leaderboard'), api('/players'),
       ]);
-      setToday(t); setGallery(g); setChain(c); setBingo(b); setHunt(h); setTop(l.leaderboard); setPlayers(p.players);
+      setToday(t); setGallery(g); setChain(c); setBingo(b); setHunt(h); setPhrase(f); setTop(l.leaderboard); setPlayers(p.players);
     } catch {
       // тихо: поллинг повторит через 30 секунд
     }
@@ -139,6 +141,7 @@ function Main({ user }) {
         {tab === 'photos' && <PhotosTab gallery={gallery} act={act} />}
         {tab === 'bingo' && <BingoTab bingo={bingo} act={act} />}
         {tab === 'chain' && <ChainTab chain={chain} act={act} />}
+        {tab === 'phrase' && <PhraseTab phrase={phrase} user={user} act={act} />}
         {tab === 'top' && <TopTab top={top} user={user} />}
         {tab === 'admin' && <AdminTab notify={notify} />}
       </main>
@@ -337,6 +340,230 @@ function LastChainEntry({ entry }) {
   );
 }
 
+// Форма слов монтируется заново на каждый раунд (key = id раунда),
+// поэтому поллинг не затирает то, что игрок сейчас печатает.
+function WordsForm({ initial, onSave }) {
+  const [adjective, setAdjective] = useState(initial?.adjective ?? '');
+  const [noun, setNoun] = useState(initial?.noun ?? '');
+
+  const submit = (e) => {
+    e.preventDefault();
+    onSave({ adjective: adjective.trim(), noun: noun.trim() });
+  };
+
+  return (
+    <form onSubmit={submit} className="phrase-form">
+      <label>
+        Прилагательное
+        <input
+          value={adjective}
+          onChange={(e) => setAdjective(e.target.value)}
+          placeholder="мокрый, святой, беременный…"
+          maxLength={30}
+          required
+        />
+      </label>
+      <label>
+        Существительное
+        <input
+          value={noun}
+          onChange={(e) => setNoun(e.target.value)}
+          placeholder="утюг, бабушка, дракон…"
+          maxLength={30}
+          required
+        />
+      </label>
+      <button className="btn btn-primary" disabled={!adjective.trim() || !noun.trim()}>
+        {initial ? 'Изменить слова' : 'Сдать слова'}
+      </button>
+    </form>
+  );
+}
+
+function PhraseCard({ item }) {
+  return (
+    <figure className={item.mine ? 'phrase-card mine' : 'phrase-card'}>
+      <figcaption className="phrase-card-head">
+        <span className="phrase-card-text">{item.adjective} {item.noun}</span>
+        <span className="phrase-card-name">{item.mine ? `${item.name} (ты)` : item.name}</span>
+      </figcaption>
+      {item.url
+        ? <img src={item.url} alt={`${item.adjective} ${item.noun}`} loading="lazy" />
+        : <div className="phrase-card-wait">ещё ищет…</div>}
+    </figure>
+  );
+}
+
+// Архив грузится отдельно от общего поллинга: он меняется редко,
+// а фото прошлых игр тянуть каждые 30 секунд незачем.
+function PhraseHistory({ roundId }) {
+  const [rounds, setRounds] = useState(null);
+
+  useEffect(() => {
+    api('/phrase/history').then((d) => setRounds(d.rounds)).catch(() => setRounds([]));
+  }, [roundId]);
+
+  if (!rounds || rounds.length === 0) return null;
+
+  return (
+    <section className="phrase-past-list">
+      <h3 className="page-title">Прошлые игры</h3>
+      {rounds.map((r) => (
+        <details key={r.id} className="phrase-past">
+          <summary>
+            Игра #{r.id} · {r.date.slice(8, 10)}.{r.date.slice(5, 7)} · {r.photos} из {r.items.length} фото
+          </summary>
+          <div className="phrase-grid">
+            {r.items.map((i) => <PhraseCard key={i.userId} item={i} />)}
+          </div>
+        </details>
+      ))}
+    </section>
+  );
+}
+
+function PhraseTab({ phrase, user, act }) {
+  if (!phrase) return <div className="loading">Тасуем слова…</div>;
+  if (!phrase.enabled) {
+    return (
+      <div className="empty">
+        <div className="empty-icon">🎭</div>
+        <p>Фотофраза выключена админом.</p>
+      </div>
+    );
+  }
+
+  const status = phrase.round?.status ?? null;
+  const ready = phrase.players.length;
+  const done = phrase.assignments.filter((a) => a.url).length;
+
+  const saveWords = (body) =>
+    act(() => api('/phrase/words', { method: 'POST', body }), 'Слова приняты!');
+  const uploadPhoto = (file) => {
+    const fd = new FormData();
+    fd.append('photo', file);
+    act(() => api('/phrase/photo', { method: 'POST', formData: fd }), `🎭 Принято! +${phrase.photoPoints}`);
+  };
+
+  return (
+    <div className="stack">
+      {status === null && (
+        <section className="ticket ticket-lantern phrase-hero">
+          <div className="ticket-tag">Фотофраза · слова +{phrase.wordPoints} · фото +{phrase.photoPoints}</div>
+          <h2>Каждый сдаёт два слова — получает чужие</h2>
+          <p className="hint">
+            Все скидывают по одному прилагательному и одному существительному. На старте слова
+            перемешиваются: тебе достаётся чужая пара, и её надо сфотографировать в реальной жизни.
+          </p>
+          <div className="btn-row">
+            <button className="btn btn-jade" onClick={() => act(() => api('/phrase/round', { method: 'POST' }), 'Раунд открыт — сдавайте слова')}>
+              Открыть раунд
+            </button>
+          </div>
+        </section>
+      )}
+
+      {status === 'collecting' && (
+        <>
+          <section className="ticket ticket-lantern">
+            <div className="ticket-tag">Раунд #{phrase.round.id} · сбор слов · +{phrase.wordPoints}</div>
+            <h2>Два слова от тебя</h2>
+            <p className="hint">
+              Чужие слова скрыты до старта. Загадывай так, чтобы сфоткать было реально — но смешно.
+            </p>
+            <WordsForm key={phrase.round.id} initial={phrase.myWords} onSave={saveWords} />
+          </section>
+
+          <section className="ticket ticket-jade">
+            <div className="ticket-tag">Готовы: {ready} · нужно минимум {phrase.minPlayers}</div>
+            <div className="phrase-players">
+              {phrase.players.map((p) => (
+                <span key={p.userId} className="phrase-player">✓ {p.mine ? `${p.name} (ты)` : p.name}</span>
+              ))}
+              {ready === 0 && <p className="hint">Пока никто не сдал слова.</p>}
+            </div>
+            <div className="btn-row">
+              <button
+                className="btn btn-jade"
+                disabled={ready < phrase.minPlayers}
+                onClick={() => act(() => api('/phrase/start', { method: 'POST' }), '🎲 Слова перемешаны!')}
+              >
+                Начать игру ({ready})
+              </button>
+            </div>
+            {ready < phrase.minPlayers && <p className="hint">Ждём ещё игроков со словами.</p>}
+            {user.isAdmin && (
+              <>
+                <button
+                  className="btn btn-ghost phrase-admin-close"
+                  onClick={() => act(() => api('/phrase/finish', { method: 'POST' }), 'Игра закрыта — можно открыть новую')}
+                >
+                  Закрыть игру, не начиная
+                </button>
+                <p className="hint">Только для админа: сдаться и начать новую игру в другой день.</p>
+              </>
+            )}
+          </section>
+        </>
+      )}
+
+      {status === 'playing' && (
+        <>
+          <section className="ticket ticket-brass phrase-hero">
+            <div className="ticket-tag">Раунд #{phrase.round.id} · твоя фраза · фото +{phrase.photoPoints}</div>
+            {phrase.myAssignment ? (
+              <>
+                <div className="phrase-big">{phrase.myAssignment.adjective}<br />{phrase.myAssignment.noun}</div>
+                <p className="hint">Найди или устрой это в реальной жизни и сфоткай. Одна попытка.</p>
+                {phrase.myAssignment.url ? (
+                  <div className="done-line">✓ Фото сдано. Ждём остальных.</div>
+                ) : (
+                  <FileButton label="📸 Сдать фото" onFile={uploadPhoto} />
+                )}
+              </>
+            ) : (
+              <p className="hint">Ты не успел сдать слова — этот раунд идёт без тебя. Подключайся к следующему.</p>
+            )}
+            <p className="hint">Сдали {done} из {phrase.assignments.length}.</p>
+          </section>
+
+          <div className="phrase-grid">
+            {phrase.assignments.map((a) => <PhraseCard key={a.userId} item={a} />)}
+          </div>
+
+          <button
+            className="btn btn-ghost"
+            onClick={() => act(() => api('/phrase/finish', { method: 'POST' }), 'Раунд закрыт')}
+          >
+            Завершить раунд досрочно
+          </button>
+        </>
+      )}
+
+      {status === 'finished' && (
+        <>
+          <section className="ticket ticket-jade phrase-hero">
+            <div className="ticket-tag">Раунд #{phrase.round.id} · итоги</div>
+            <h2>Раунд сыгран</h2>
+            <p className="hint">Сфоткано {done} из {phrase.assignments.length} фраз.</p>
+            <div className="btn-row">
+              <button className="btn btn-jade" onClick={() => act(() => api('/phrase/round', { method: 'POST' }), 'Новый раунд открыт')}>
+                Новый раунд
+              </button>
+            </div>
+          </section>
+
+          <div className="phrase-grid">
+            {phrase.assignments.map((a) => <PhraseCard key={a.userId} item={a} />)}
+          </div>
+        </>
+      )}
+
+      <PhraseHistory roundId={phrase.round?.id ?? 0} />
+    </div>
+  );
+}
+
 function ConfirmModal({ title, text, confirmLabel, onConfirm, onCancel }) {
   return (
     <div className="modal-backdrop" onClick={onCancel}>
@@ -382,8 +609,9 @@ function BingoTab({ bingo, act }) {
           Бинго дня · клетка +{bingo.cellPoints} · линия +{bingo.linePoints} · вся карта +{bingo.cardPoints}
         </div>
         <p className="hint">
-          Увидел слово на вывеске или услышал от посторонних (наши не считаются!) — тапни клетку.
-          Линия — 5 в ряд по горизонтали, вертикали или диагонали.
+          Высмотрел это вокруг — тапни клетку. Подстраивать не считается:
+          сам купил баблти — мимо. Линия — 5 в ряд по горизонтали,
+          вертикали или диагонали.
         </p>
         <div className="bingo-grid">
           {bingo.cells.map((c, i) => (
@@ -406,7 +634,7 @@ function BingoTab({ bingo, act }) {
           title={confirm.marked ? 'Сбросить отметку?' : 'Отметить клетку?'}
           text={confirm.marked
             ? `Снимаем отметку с «${confirm.word}» — очки за неё уйдут.`
-            : `«${confirm.word}» — правда видел или слышал от посторонних? Честность — валюта этой игры.`}
+            : `«${confirm.word}» — правда видел это своими глазами? Честность — валюта этой игры.`}
           confirmLabel={confirm.marked ? 'Да, сбросить' : 'Да, подтверждаю'}
           onConfirm={apply}
           onCancel={() => setConfirm(null)}
@@ -545,7 +773,8 @@ function TopTab({ top, user }) {
         {top.length === 0 && <p className="hint">Пока пусто. Позови банду.</p>}
       </section>
       <p className="hint center">
-        фото +5 · голос за твоё фото +7 · число N +N (до 30) · охота: цель +8 · бинго: клетка +2, линия +10, вся карта +40
+        фото +5 · голос за твоё фото +7 · число N +N (до 30) · охота: цель +8 ·
+        бинго: клетка +2, линия +10, вся карта +40 · фразы: слова +3, фото по фразе +12
       </p>
     </div>
   );

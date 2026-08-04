@@ -171,6 +171,82 @@ img { display: block; max-width: 100%; }
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 
+/* ── Фотофраза ──────────────────────────────────────────────── */
+.phrase-hero { text-align: center; }
+.phrase-big {
+  font-size: 30px; font-weight: 900; line-height: 1.2;
+  color: var(--brass);
+  text-shadow: 0 0 30px rgba(255, 197, 61, 0.3);
+  margin: 8px 0 4px;
+  overflow-wrap: break-word;
+}
+.phrase-form { display: flex; flex-direction: column; gap: 12px; margin-top: 6px; text-align: left; }
+.phrase-form label {
+  display: flex; flex-direction: column; gap: 6px;
+  font-size: 13px; font-weight: 600; color: var(--muted);
+}
+.phrase-form input {
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(243, 236, 220, 0.2);
+  border-radius: 10px;
+  padding: 13px 14px;
+  color: var(--text); font-size: 16px;
+  outline: none;
+}
+.phrase-form input:focus { border-color: var(--brass); }
+
+.phrase-players { display: flex; flex-wrap: wrap; gap: 8px; }
+.phrase-player {
+  background: rgba(59, 227, 167, 0.12);
+  border: 1px solid rgba(59, 227, 167, 0.3);
+  color: var(--jade);
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 13px; font-weight: 600;
+}
+
+.phrase-grid { display: flex; flex-direction: column; gap: 12px; }
+.phrase-card {
+  background: var(--card); border-radius: 14px; overflow: hidden; box-shadow: var(--shadow);
+}
+.phrase-card.mine { outline: 1px solid rgba(255, 197, 61, 0.45); }
+.phrase-card-head {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+  padding: 12px 14px;
+}
+.phrase-card-text { font-weight: 800; font-size: 16px; line-height: 1.3; }
+.phrase-card-name { color: var(--muted); font-size: 12px; white-space: nowrap; }
+.phrase-card img { width: 100%; max-height: 360px; object-fit: cover; }
+.phrase-card-wait {
+  padding: 22px 14px; text-align: center;
+  color: var(--muted); font-size: 13px;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.phrase-admin-close { width: 100%; margin-top: 10px; }
+
+.phrase-past-list { display: flex; flex-direction: column; gap: 10px; }
+.phrase-past {
+  background: var(--card);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+.phrase-past summary {
+  padding: 14px 16px;
+  font-size: 14px; font-weight: 700;
+  color: var(--brass);
+  cursor: pointer;
+  list-style: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.phrase-past summary::-webkit-details-marker { display: none; }
+.phrase-past summary::before { content: '▸ '; }
+.phrase-past[open] summary::before { content: '▾ '; }
+.phrase-past[open] summary { border-bottom: 1px dashed rgba(243, 236, 220, 0.15); }
+.phrase-past .phrase-grid { padding: 12px; }
+.phrase-past .phrase-card { background: rgba(0, 0, 0, 0.22); }
+
 /* ── Бинго ──────────────────────────────────────────────────── */
 .bingo-grid {
   display: grid;
@@ -280,11 +356,12 @@ img { display: block; max-width: 100%; }
   flex: 1;
   display: flex; flex-direction: column; align-items: center; gap: 2px;
   background: none; border: none;
-  padding: 10px 0 8px;
-  font-size: 11px; color: var(--muted);
+  min-width: 0;
+  padding: 10px 2px 8px;
+  font-size: 10px; color: var(--muted);
   cursor: pointer;
 }
-.tab-icon { font-size: 20px; }
+.tab-icon { font-size: 19px; }
 .tab.active { color: var(--brass); }
 .tab.active .tab-icon { transform: translateY(-1px); }
 

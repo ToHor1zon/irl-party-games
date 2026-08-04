@@ -10,6 +10,7 @@ import photosRouter from './routes/photos.js';
 import chainRouter from './routes/chain.js';
 import bingoRouter from './routes/bingo.js';
 import huntRouter from './routes/hunt.js';
+import phraseRouter from './routes/phrase.js';
 import metaRouter from './routes/meta.js';
 import adminRouter from './routes/admin.js';
 
@@ -31,6 +32,7 @@ app.use('/api/photos', photosRouter);
 app.use('/api/chain', chainRouter);
 app.use('/api/bingo', bingoRouter);
 app.use('/api/hunt', huntRouter);
+app.use('/api/phrase', phraseRouter);
 app.use('/api', metaRouter);
 
 app.use('/uploads', express.static(UPLOADS_DIR, { maxAge: '30d', immutable: true }));

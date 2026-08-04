@@ -19,12 +19,18 @@ export function requireAuth(req, res, next) {
   const header = req.headers.authorization || '';
   const token = header.startsWith('Bearer ') ? header.slice(7) : null;
   if (!token) return res.status(401).json({ error: 'Нужна авторизация' });
+  let payload;
   try {
-    req.user = jwt.verify(token, JWT_SECRET);
-    next();
+    payload = jwt.verify(token, JWT_SECRET);
   } catch {
     return res.status(401).json({ error: 'Токен протух, зайди заново' });
   }
+  // Игрока могли снести сбросом игры: без этой проверки токен остаётся
+  // «живым», а любая запись падает на внешнем ключе.
+  if (!db.prepare('SELECT 1 FROM users WHERE id = ?').get(payload.id))
+    return res.status(401).json({ error: 'Игру сбросили — зарегистрируйся заново' });
+  req.user = payload;
+  next();
 }
 
 // Права смотрим в БД, а не в токене: назначение админа действует без перевыпуска JWT.

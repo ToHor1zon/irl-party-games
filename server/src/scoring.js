@@ -23,6 +23,15 @@ export function leaderboard() {
   for (const r of db.prepare('SELECT user_id, COUNT(*) AS c FROM hunt_photos GROUP BY user_id').all())
     add(r.user_id, r.c * cfg.hunt.itemPoints);
 
+  for (const r of db.prepare('SELECT user_id, COUNT(*) AS c FROM phrase_words GROUP BY user_id').all())
+    add(r.user_id, r.c * cfg.phrase.wordPoints);
+
+  for (const r of db.prepare(`
+    SELECT user_id, COUNT(*) AS c FROM phrase_assignments
+    WHERE filename IS NOT NULL GROUP BY user_id
+  `).all())
+    add(r.user_id, r.c * cfg.phrase.photoPoints);
+
   for (const r of db.prepare('SELECT user_id, marks FROM bingo_cards').all()) {
     try { add(r.user_id, cardScore(JSON.parse(r.marks), cfg.bingo)); } catch { /* битая строка не валит топ */ }
   }

@@ -69,6 +69,37 @@ CREATE TABLE IF NOT EXISTS hunt_photos (
   PRIMARY KEY (date, user_id, item_idx)
 );
 
+-- Фотофраза: раунд живёт по своему циклу, а не по игровому дню.
+-- collecting → playing → finished; текущий раунд — всегда с максимальным id.
+CREATE TABLE IF NOT EXISTS phrase_rounds (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  status TEXT NOT NULL DEFAULT 'collecting',
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  started_at TEXT,
+  finished_at TEXT
+);
+
+-- Пара слов от игрока: пока раунд собирается, чужие слова никому не видны.
+CREATE TABLE IF NOT EXISTS phrase_words (
+  round_id INTEGER NOT NULL REFERENCES phrase_rounds(id) ON DELETE CASCADE,
+  user_id INTEGER NOT NULL REFERENCES users(id),
+  adjective TEXT NOT NULL,
+  noun TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (round_id, user_id)
+);
+
+-- Выданное словосочетание и фото-ответ на него.
+CREATE TABLE IF NOT EXISTS phrase_assignments (
+  round_id INTEGER NOT NULL REFERENCES phrase_rounds(id) ON DELETE CASCADE,
+  user_id INTEGER NOT NULL REFERENCES users(id),
+  adjective TEXT NOT NULL,
+  noun TEXT NOT NULL,
+  filename TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (round_id, user_id)
+);
+
 -- Конфиг игр из админки: одна строка JSON поверх дефолтов из content.js.
 CREATE TABLE IF NOT EXISTS config (
   id INTEGER PRIMARY KEY CHECK (id = 1),
