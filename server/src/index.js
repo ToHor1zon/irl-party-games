@@ -5,12 +5,10 @@ import { fileURLToPath } from 'node:url';
 import { UPLOADS_DIR } from './db.js';
 import { requireAuth, requireAdmin } from './auth.js';
 import authRouter from './routes/auth.js';
-import dayRouter from './routes/day.js';
-import photosRouter from './routes/photos.js';
-import chainRouter from './routes/chain.js';
 import bingoRouter from './routes/bingo.js';
 import huntRouter from './routes/hunt.js';
-import phraseRouter from './routes/phrase.js';
+import daresRouter from './routes/dares.js';
+import galleryRouter from './routes/gallery.js';
 import metaRouter from './routes/meta.js';
 import adminRouter from './routes/admin.js';
 
@@ -27,12 +25,10 @@ app.use('/api/auth', authRouter);
 // Всё остальное API — только с Bearer JWT.
 app.use('/api', requireAuth);
 app.use('/api/admin', requireAdmin, adminRouter);
-app.use('/api/day', dayRouter);
-app.use('/api/photos', photosRouter);
-app.use('/api/chain', chainRouter);
 app.use('/api/bingo', bingoRouter);
 app.use('/api/hunt', huntRouter);
-app.use('/api/phrase', phraseRouter);
+app.use('/api/dares', daresRouter);
+app.use('/api/gallery', galleryRouter);
 app.use('/api', metaRouter);
 
 app.use('/uploads', express.static(UPLOADS_DIR, { maxAge: '30d', immutable: true }));

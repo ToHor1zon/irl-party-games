@@ -2,6 +2,7 @@ node_modules/
 dist/
 data/
 server/data/
+server/data.bak*/
 .env
 .DS_Store
 *.log

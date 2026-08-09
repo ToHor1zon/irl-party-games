@@ -6,6 +6,7 @@
   --lantern: #FF4438;
   --brass: #FFC53D;
   --jade: #3BE3A7;
+  --azure: #5AC8FA;
   --muted: rgba(243, 236, 220, 0.55);
   --shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
 }
@@ -129,33 +130,6 @@ img { display: block; max-width: 100%; }
 .photo-author { font-weight: 700; flex: 1; }
 .photo-votes { color: var(--brass); font-weight: 700; }
 
-/* ── Цепочка ────────────────────────────────────────────────── */
-.chain-hero { text-align: center; }
-.chain-number {
-  font-size: 84px; font-weight: 900;
-  color: var(--brass);
-  text-shadow: 0 0 34px rgba(255, 197, 61, 0.35);
-  line-height: 1.1; margin: 4px 0;
-}
-.chain-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.chain-card {
-  background: var(--card); border-radius: 12px; overflow: hidden; box-shadow: var(--shadow);
-}
-.chain-card img { width: 100%; height: 110px; object-fit: cover; }
-.chain-card figcaption { padding: 8px 10px; font-size: 12px; color: var(--muted); }
-.chain-card b { color: var(--brass); font-size: 14px; }
-.chain-preview { text-align: center; }
-.chain-latest { margin: 16px auto 0; max-width: 360px; }
-.chain-latest-photo { position: relative; overflow: hidden; border-radius: 12px; background: #111; }
-.chain-latest-photo img { display: block; width: 100%; max-height: 260px; object-fit: cover; }
-.chain-latest-number {
-  position: absolute; right: 10px; bottom: 10px;
-  min-width: 48px; padding: 5px 10px; border-radius: 10px;
-  color: #20150a; background: var(--brass); font-size: 28px; font-weight: 900;
-  line-height: 1; box-shadow: 0 3px 12px rgba(0, 0, 0, 0.45);
-}
-.chain-latest figcaption { margin-top: 8px; color: var(--muted); font-size: 13px; }
-
 /* ── Фотоохота ──────────────────────────────────────────────── */
 .hunt-item { padding: 12px 0; }
 .hunt-item:not(:last-child) { border-bottom: 1px dashed rgba(243, 236, 220, 0.15); }
@@ -163,6 +137,156 @@ img { display: block; max-width: 100%; }
 .hunt-text { flex: 1; font-weight: 700; font-size: 15px; line-height: 1.35; }
 .hunt-done { color: var(--jade); font-weight: 800; white-space: nowrap; }
 .hunt-head .btn-small { white-space: nowrap; }
+/* Персональное задание помечается, чтобы не искали его у соседа. */
+.hunt-personal {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgba(243, 236, 220, 0.14);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  vertical-align: middle;
+}
+.hunt-mine { margin: 10px 0 0; }
+.hunt-mine img {
+  width: 100%;
+  max-height: 220px;
+  object-fit: cover;
+  border-radius: 10px;
+}
+
+/* «Слабо»: длинные формулировки, поэтому текст занимает всю ширину строки. */
+.dare-item { padding: 10px 0; }
+.dare-item:not(:last-child) { border-bottom: 1px dashed rgba(243, 236, 220, 0.15); }
+.dare-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.dare-text { flex: 1; font-weight: 700; font-size: 14px; line-height: 1.35; }
+.dare-text.done { color: var(--jade); }
+.dare-head .btn-small { white-space: nowrap; }
+.dare-meta {
+  display: flex; gap: 10px; flex-wrap: wrap;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--text-dim, #9a9ab0);
+}
+.dare-done { color: var(--jade); font-weight: 700; }
+.dare-shot { margin: 8px 0 0; }
+.dare-shot img {
+  width: 100%;
+  max-height: 200px;
+  object-fit: cover;
+  border-radius: 10px;
+}
+
+/* Виджет голосования: задание сверху, снимок, оценки под ним. Своё и чужое
+   должно различаться с одного взгляда — у чужого снимка холодный синий тон,
+   у собственных карточек остаются тёплые фонарь/латунь/нефрит. */
+.vote-card {
+  border-top-color: var(--azure);
+  background:
+    linear-gradient(180deg, rgba(90, 200, 250, 0.13), rgba(90, 200, 250, 0) 180px),
+    var(--card);
+  box-shadow: 0 0 0 1px rgba(90, 200, 250, 0.28), var(--shadow);
+}
+.vote-card .ticket-tag { color: var(--azure); }
+.vote-task { margin: 4px 0 10px; font-size: 18px; line-height: 1.3; }
+.vote-photo {
+  width: 100%;
+  max-height: 340px;
+  object-fit: contain;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.3);
+}
+.vote-scores {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin: 10px 0 8px;
+}
+.vote-score {
+  padding: 14px 0;
+  font-size: 20px;
+  font-weight: 800;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(243, 236, 220, 0.18);
+}
+.vote-funny {
+  width: 100%;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px dashed rgba(243, 236, 220, 0.3);
+}
+.vote-score.on {
+  background: rgba(90, 200, 250, 0.28);
+  border-color: var(--azure);
+  color: #eaf8ff;
+}
+.vote-funny.on {
+  background: rgba(255, 196, 61, 0.22);
+  border-style: solid;
+  border-color: var(--gold, #ffc43d);
+}
+.vote-send {
+  width: 100%;
+  margin-top: 10px;
+  padding: 13px 0;
+  font-weight: 800;
+  background: var(--azure);
+  color: #06263a;
+}
+.vote-send:disabled {
+  background: rgba(90, 200, 250, 0.18);
+  color: var(--muted);
+  cursor: default;
+}
+
+/* ── Лента поездки ──────────────────────────────────────────── */
+.feed-theme { margin: 2px 0 10px; font-size: 16px; line-height: 1.35; }
+.feed-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.feed-card {
+  background: rgba(0, 0, 0, 0.25); border-radius: 12px; overflow: hidden;
+}
+.feed-photo { position: relative; }
+.feed-card img { width: 100%; height: 130px; object-fit: cover; display: block; }
+.feed-card figcaption { padding: 7px 9px; font-size: 12px; color: var(--muted); }
+.feed-card b { color: var(--text); }
+/* Счётчики лежат поверх кадра: слева очки, справа угар. Подкладка нужна,
+   чтобы цифры читались на светлом снимке. */
+.feed-score,
+.feed-funny {
+  position: absolute; bottom: 6px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(10, 6, 20, 0.78);
+  font-size: 11px; font-weight: 700; line-height: 1.4;
+}
+.feed-score { left: 6px; color: #fff; }
+.feed-funny { right: 6px; color: #fff; }
+.feed-photo {
+  display: block; width: 100%;
+  padding: 0; border: none; background: none; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.feed-photo:active { filter: brightness(1.12); }
+
+/* Просмотр кадра из ленты: тема сверху, под фото — автор и обе плашки.
+   Чужие снимки только смотрят, поэтому кнопка здесь одна. */
+.feed-viewer { border-top-color: var(--lantern); }
+.feed-viewer .shot-word { font-size: 16px; }
+.feed-viewer-meta {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  margin-top: 10px;
+  font-size: 13px; color: var(--muted);
+}
+.feed-viewer-author { flex: 1; color: var(--text); font-weight: 700; }
+.feed-badge {
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba(10, 6, 20, 0.78);
+  color: #fff;
+  font-size: 12px; font-weight: 700;
+}
+
 .hunt-finds { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 .hunt-find { width: 72px; }
 .hunt-find img { width: 72px; height: 72px; object-fit: cover; border-radius: 8px; }
@@ -255,6 +379,8 @@ img { display: block; max-width: 100%; }
   margin: 12px 0 4px;
 }
 .bingo-cell {
+  position: relative;
+  overflow: hidden;
   display: flex; align-items: center; justify-content: center;
   min-height: 58px;
   padding: 4px 3px;
@@ -275,6 +401,46 @@ img { display: block; max-width: 100%; }
   color: var(--jade);
   text-decoration: line-through;
 }
+/* Фото-доказательство подложкой: слово поверх, поэтому кадр приглушён. */
+.bingo-shot {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  object-fit: cover;
+  opacity: 0.4;
+}
+.bingo-word { position: relative; }
+.bingo-cell.marked .bingo-word { text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9); }
+
+/* ── Личная галерея ─────────────────────────────────────────── */
+/* День — карточка, внутри снимки с оценками в углах кадра. */
+.mine-grid { display: flex; flex-direction: column; gap: 12px; margin-top: 10px; }
+.mine-card { margin: 0; }
+.mine-photo { position: relative; }
+.mine-photo img {
+  width: 100%;
+  max-height: 240px;
+  object-fit: cover;
+  border-radius: 10px;
+  display: block;
+}
+.mine-score {
+  position: absolute; left: 8px; bottom: 8px;
+  min-width: 30px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(10, 6, 20, 0.78);
+  font-weight: 800;
+  text-align: center;
+}
+.mine-funny {
+  position: absolute; right: 8px; bottom: 8px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(10, 6, 20, 0.78);
+  font-weight: 700;
+  font-size: 12px;
+}
+.mine-task { margin-top: 6px; font-size: 13px; line-height: 1.35; }
 
 /* ── Модалка подтверждения ──────────────────────────────────── */
 .modal-backdrop {
@@ -295,6 +461,33 @@ img { display: block; max-width: 100%; }
 }
 .modal h3 { margin-bottom: 8px; }
 .modal-text { font-size: 14px; color: var(--muted); line-height: 1.5; margin-bottom: 14px; }
+
+/* ── Просмотр снимка бинго ──────────────────────────────────── */
+/* Сначала кадр, потом решение: сброс стоит рядом с тем, что удаляют. */
+.shot-viewer {
+  width: 100%; max-width: 360px;
+  background: var(--card);
+  border-radius: 14px;
+  border-top: 4px solid var(--jade);
+  padding: 16px;
+  box-shadow: var(--shadow);
+  animation: toast-in 0.2s ease;
+}
+.shot-word { margin-bottom: 10px; font-size: 17px; }
+.shot-photo {
+  width: 100%;
+  max-height: 60vh;
+  object-fit: contain;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.35);
+  display: block;
+}
+.btn-reset {
+  flex: 1;
+  background: rgba(255, 92, 122, 0.16);
+  color: #ff8fa3;
+  border: 1px solid rgba(255, 92, 122, 0.45);
+}
 
 /* ── Админка ────────────────────────────────────────────────── */
 .admin-add { display: flex; gap: 8px; margin-bottom: 12px; }

@@ -1,14 +1,22 @@
 import { db } from './db.js';
-import { MISSIONS, BINGO_WORDS, HUNT_ITEMS } from './content.js';
+import { BINGO_WORDS, HUNT_ITEMS, DARE_FOOD, DARE_COURAGE, DARE_EXTREME } from './content.js';
 
 // Конфиг игр: дефолты из content.js, переопределения — в таблице config (одна строка JSON).
 // Меняется через админку; кэшируется в памяти процесса.
 export const DEFAULT_CONFIG = {
-  photo: { enabled: true, submitPoints: 5, votePoints: 7, missions: MISSIONS },
-  chain: { enabled: true, maxPoints: 30 },
-  bingo: { enabled: true, cellPoints: 2, linePoints: 10, cardPoints: 40, words: BINGO_WORDS },
-  hunt: { enabled: true, itemPoints: 8, items: HUNT_ITEMS },
-  phrase: { enabled: true, wordPoints: 3, photoPoints: 12 },
+  bingo:{ enabled: true, cellPoints: 2, linePoints: 10, cardPoints: 40, words: BINGO_WORDS },
+  // Очки за охоту дают только оценки зрителей; funnyBonus — приз за «угар».
+  hunt: { enabled: true, funnyBonus: 5, items: HUNT_ITEMS },
+  // «Слабо»: цена челленджа растёт с риском, поэтому пулы разнесены по тирам.
+  dares: {
+    enabled: true,
+    foodPoints: 10,
+    couragePoints: 15,
+    extremePoints: 25,
+    food: DARE_FOOD,
+    courage: DARE_COURAGE,
+    extreme: DARE_EXTREME,
+  },
 };
 
 let cache = null;
@@ -27,16 +35,6 @@ function normalize(raw) {
   const r = raw ?? {};
   const d = DEFAULT_CONFIG;
   return {
-    photo: {
-      enabled: bool(r.photo?.enabled, d.photo.enabled),
-      submitPoints: num(r.photo?.submitPoints, d.photo.submitPoints),
-      votePoints: num(r.photo?.votePoints, d.photo.votePoints),
-      missions: list(r.photo?.missions, d.photo.missions),
-    },
-    chain: {
-      enabled: bool(r.chain?.enabled, d.chain.enabled),
-      maxPoints: num(r.chain?.maxPoints, d.chain.maxPoints, 1),
-    },
     bingo: {
       enabled: bool(r.bingo?.enabled, d.bingo.enabled),
       cellPoints: num(r.bingo?.cellPoints, d.bingo.cellPoints),
@@ -46,13 +44,17 @@ function normalize(raw) {
     },
     hunt: {
       enabled: bool(r.hunt?.enabled, d.hunt.enabled),
-      itemPoints: num(r.hunt?.itemPoints, d.hunt.itemPoints),
+      funnyBonus: num(r.hunt?.funnyBonus, d.hunt.funnyBonus),
       items: list(r.hunt?.items, d.hunt.items),
     },
-    phrase: {
-      enabled: bool(r.phrase?.enabled, d.phrase.enabled),
-      wordPoints: num(r.phrase?.wordPoints, d.phrase.wordPoints),
-      photoPoints: num(r.phrase?.photoPoints, d.phrase.photoPoints),
+    dares: {
+      enabled: bool(r.dares?.enabled, d.dares.enabled),
+      foodPoints: num(r.dares?.foodPoints, d.dares.foodPoints),
+      couragePoints: num(r.dares?.couragePoints, d.dares.couragePoints),
+      extremePoints: num(r.dares?.extremePoints, d.dares.extremePoints),
+      food: list(r.dares?.food, d.dares.food),
+      courage: list(r.dares?.courage, d.dares.courage),
+      extreme: list(r.dares?.extreme, d.dares.extreme),
     },
   };
 }

@@ -3,10 +3,10 @@ import { api, getToken, setToken } from './api.js';
 
 const TABS = [
   { id: 'today', label: 'Сегодня', icon: '🏮' },
-  { id: 'photos', label: 'Фото', icon: '📸' },
+  { id: 'dares', label: 'Слабо', icon: '😤' },
   { id: 'bingo', label: 'Бинго', icon: '🎯' },
-  { id: 'chain', label: 'Цепочка', icon: '🔢' },
-  { id: 'phrase', label: 'Фразы', icon: '🎭' },
+  { id: 'feed', label: 'Лента', icon: '🖼️' },
+  { id: 'mine', label: 'Моё', icon: '📅' },
   { id: 'top', label: 'Топ', icon: '🏆' },
 ];
 const ADMIN_TAB = { id: 'admin', label: 'Админ', icon: '⚙️' };
@@ -86,14 +86,11 @@ function Join({ onJoin }) {
 
 function Main({ user }) {
   const [tab, setTab] = useState('today');
-  const [today, setToday] = useState(null);
-  const [gallery, setGallery] = useState(null);
-  const [chain, setChain] = useState(null);
   const [bingo, setBingo] = useState(null);
   const [hunt, setHunt] = useState(null);
-  const [phrase, setPhrase] = useState(null);
+  const [vote, setVote] = useState(null);
+  const [dares, setDares] = useState(null);
   const [top, setTop] = useState(null);
-  const [players, setPlayers] = useState([]);
   const [toast, setToast] = useState(null);
   const toastTimer = useRef(null);
 
@@ -105,10 +102,10 @@ function Main({ user }) {
 
   const refresh = useCallback(async () => {
     try {
-      const [t, g, c, b, h, f, l, p] = await Promise.all([
-        api('/day/today'), api('/photos/today'), api('/chain'), api('/bingo'), api('/hunt'), api('/phrase'), api('/leaderboard'), api('/players'),
+      const [b, h, v, d, l] = await Promise.all([
+        api('/bingo'), api('/hunt'), api('/hunt/vote'), api('/dares'), api('/leaderboard'),
       ]);
-      setToday(t); setGallery(g); setChain(c); setBingo(b); setHunt(h); setPhrase(f); setTop(l.leaderboard); setPlayers(p.players);
+      setBingo(b); setHunt(h); setVote(v); setDares(d); setTop(l.leaderboard);
     } catch {
       // тихо: поллинг повторит через 30 секунд
     }
@@ -137,12 +134,12 @@ function Main({ user }) {
         <span className="topbar-user">{user.name}</span>
       </header>
       <main className="content">
-        {tab === 'today' && <TodayTab today={today} hunt={hunt} chain={chain} act={act} />}
-        {tab === 'photos' && <PhotosTab gallery={gallery} act={act} />}
+        {tab === 'today' && <TodayTab hunt={hunt} vote={vote} act={act} />}
+        {tab === 'dares' && <DaresTab dares={dares} act={act} />}
         {tab === 'bingo' && <BingoTab bingo={bingo} act={act} />}
-        {tab === 'chain' && <ChainTab chain={chain} act={act} />}
-        {tab === 'phrase' && <PhraseTab phrase={phrase} user={user} act={act} />}
-        {tab === 'top' && <TopTab top={top} user={user} />}
+        {tab === 'feed' && <FeedTab />}
+        {tab === 'mine' && <MyGalleryTab />}
+        {tab === 'top' &&<TopTab top={top} user={user} hunt={hunt} dares={dares} />}
         {tab === 'admin' && <AdminTab notify={notify} />}
       </main>
       {toast && <div className="toast">{toast}</div>}
@@ -158,190 +155,418 @@ function Main({ user }) {
   );
 }
 
-function FileButton({ label, onFile, className = 'btn btn-primary' }) {
-  const ref = useRef(null);
+// Автор снимка намеренно не показывается: оценка должна достаться кадру,
+// а не тому, кто его принёс.
+function VoteCard({ vote, act }) {
+  const [funny, setFunny] = useState(false);
+  const [score, setScore] = useState(null);
+  const photo = vote.photo;
+
+  // Оценка уходит только по кнопке: цифра — это выбор, который ещё можно
+  // передумать, а отправка необратима (второй раз тот же снимок не оценить).
+  const send = () => act(
+    () => api('/hunt/vote', {
+      method: 'POST',
+      body: { itemIdx: photo.itemIdx, photoUserId: photo.photoUserId, score, funny },
+    }),
+    funny ? '😂 Засчитано вместе с угаром' : 'Оценка принята',
+  );
+
   return (
-    <>
-      <button className={className} onClick={() => ref.current?.click()}>{label}</button>
+    <section className="ticket vote-card">
+      <div className="ticket-tag">Чужой снимок · на оценке · осталось {vote.remaining}</div>
+      <h2 className="vote-task">{photo.itemText}</h2>
+      <img className="vote-photo" src={photo.url} alt={photo.itemText ?? 'Снимок на оценку'} />
+      <p className="hint center">Насколько это отвечает заданию?</p>
+      <div className="vote-scores">
+        {[0, 1, 2, 3].map((s) => (
+          <button
+            key={s}
+            className={score === s ? 'btn vote-score on' : 'btn vote-score'}
+            onClick={() => setScore(s)}
+          >
+            {s}
+          </button>
+        ))}
+      </div>
+      <button
+        className={funny ? 'btn vote-funny on' : 'btn vote-funny'}
+        onClick={() => setFunny((v) => !v)}
+      >
+        {funny ? '😂 Угар отмечен' : '😂 Угар'}
+      </button>
+      <button className="btn vote-send" disabled={score === null} onClick={send}>
+        {score === null ? 'Выбери оценку' : `Подтвердить: ${score}${funny ? ' + 😂' : ''}`}
+      </button>
+      <p className="hint center">
+        0 — вообще мимо, 3 — точно в цель. «Угар» ставится отдельно от оценки
+        и уходит вместе с ней по кнопке подтверждения.
+      </p>
+    </section>
+  );
+}
+
+const FEED_SOURCES = {
+  hunt: { label: 'Фотоохота', cls: 'ticket-jade' },
+  bingo: { label: 'Бинго', cls: 'ticket-brass' },
+  dares: { label: 'Слабо', cls: 'ticket-lantern' },
+};
+
+// Лента поездки: группировка по теме, а не по дню — один и тот же сюжет,
+// снятый в разные дни разными людьми, интереснее смотреть рядом.
+function FeedTab() {
+  const [feed, setFeed] = useState(null);
+  const [error, setError] = useState(null);
+  const [viewer, setViewer] = useState(null); // {theme, source, photo} — открытый кадр
+
+  useEffect(() => {
+    api('/gallery').then(setFeed).catch((e) => setError(e.message));
+  }, []);
+
+  if (error) return <div className="empty"><div className="empty-icon">😵</div><p>{error}</p></div>;
+  if (!feed) return <div className="loading">Проявляем плёнку…</div>;
+  if (feed.groups.length === 0) {
+    return (
+      <div className="empty">
+        <div className="empty-icon">🖼️</div>
+        <p>Пока пусто. Снимки попадают в ленту, когда охота подтверждена, клетка бинго закрыта или челлендж сдан.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="stack">
+      <section className="ticket ticket-lantern">
+        <div className="ticket-tag">
+          Лента поездки · {feed.totals.photos} фото · {feed.totals.themes} тем · {feed.totals.days} дн.
+        </div>
+        <p className="hint">Снимки сгруппированы по теме — дни перемешаны специально.</p>
+      </section>
+
+      {feed.groups.map((g) => {
+        const meta = FEED_SOURCES[g.source] ?? { label: g.source, cls: '' };
+        return (
+          <section key={`${g.source}:${g.theme}`} className={`ticket ${meta.cls}`}>
+            <div className="ticket-tag">{meta.label} · {g.count} фото</div>
+            <h3 className="feed-theme">{g.theme}</h3>
+            <div className="feed-grid">
+              {g.photos.map((p) => (
+                <figure key={p.url} className="feed-card">
+                  <button
+                    type="button"
+                    className="feed-photo"
+                    onClick={() => setViewer({ theme: g.theme, source: g.source, photo: p })}
+                  >
+                    <img src={p.url} alt={g.theme} loading="lazy" />
+                    {g.source === 'hunt' && p.score > 0 && <span className="feed-score">⭐ {p.score}</span>}
+                    {p.funny > 0 && <span className="feed-funny">😂 {p.funny}</span>}
+                  </button>
+                  <figcaption><b>{p.name}</b> · {p.date}</figcaption>
+                </figure>
+              ))}
+            </div>
+          </section>
+        );
+      })}
+
+      {/* Чужой кадр можно только рассмотреть: тема, автор и обе плашки —
+          удалять или переснимать здесь нечего, поэтому кнопка одна. */}
+      {viewer && (
+        <div className="modal-backdrop" onClick={() => setViewer(null)}>
+          <div className="shot-viewer feed-viewer" onClick={(e) => e.stopPropagation()}>
+            <h3 className="shot-word">{viewer.theme}</h3>
+            <img className="shot-photo" src={viewer.photo.url} alt={viewer.theme} />
+            <div className="feed-viewer-meta">
+              <span className="feed-viewer-author">{viewer.photo.name}</span>
+              <span>{viewer.photo.date}</span>
+              {viewer.source === 'hunt' && <span className="feed-badge">⭐ {viewer.photo.score}</span>}
+              <span className="feed-badge">😂 {viewer.photo.funny}</span>
+            </div>
+            <div className="btn-row">
+              <button type="button" className="btn btn-ghost" onClick={() => setViewer(null)}>
+                Закрыть
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Личная галерея по дням. Опрашивается чаще общего поллинга: оценки капают,
+// пока остальные голосуют, и смотреть на застывшие цифры неинтересно.
+function MyGalleryTab() {
+  const [data, setData] = useState(null);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const load = () => api('/hunt/gallery').then(setData).catch((e) => setError(e.message));
+    load();
+    const timer = setInterval(load, 15_000);
+    return () => clearInterval(timer);
+  }, []);
+
+  if (error) return <div className="empty"><div className="empty-icon">😵</div><p>{error}</p></div>;
+  if (!data) return <div className="loading">Считаем оценки…</div>;
+  if (data.days.length === 0) {
+    return (
+      <div className="empty">
+        <div className="empty-icon">📅</div>
+        <p>Пока пусто. Снимки появятся здесь сразу после загрузки, а оценки — когда их наставят.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="stack">
+      <h2 className="page-title">Мои дни</h2>
+      {data.days.map((d) => (
+        <section key={d.date} className="ticket ticket-jade">
+          <div className="ticket-tag">
+            {d.date.slice(8, 10)}.{d.date.slice(5, 7)} · за день {d.total}
+            {d.funny > 0 && ` · 😂 ${d.funny}`}
+          </div>
+          <div className="mine-grid">
+            {d.items.map((it) => (
+              <figure key={it.itemIdx} className="mine-card">
+                <div className="mine-photo">
+                  <img src={it.url} alt={it.text ?? 'Снимок'} loading="lazy" />
+                  <span className="mine-score">{it.score}</span>
+                  {it.funny > 0 && <span className="mine-funny">😂 {it.funny}</span>}
+                </div>
+                <figcaption className="mine-task">{it.text ?? '—'}</figcaption>
+              </figure>
+            ))}
+          </div>
+        </section>
+      ))}
+    </div>
+  );
+}
+
+function TodayTab({ hunt, vote, act }) {
+  const fileRef = useRef(null);
+  const [pending, setPending] = useState(null); // задание, для которого выбирают снимок
+  const [confirmDay, setConfirmDay] = useState(false);
+
+  if (!hunt) return <div className="loading">Зажигаем фонари…</div>;
+
+  const pickShot = (idx) => {
+    setPending(idx);
+    fileRef.current?.click();
+  };
+
+  const upload = (file) => {
+    const idx = pending;
+    setPending(null);
+    if (idx === null) return;
+    const fd = new FormData();
+    fd.append('photo', file);
+    fd.append('item', String(idx));
+    act(() => api('/hunt', { method: 'POST', formData: fd }), '📸 Снимок сохранён');
+  };
+
+  const saveWords = (body) => act(() => api('/hunt/words', { method: 'POST', body }), 'Слова приняты!');
+
+  const confirmSubmission = () => {
+    setConfirmDay(false);
+    act(() => api('/hunt/confirm', { method: 'POST' }), '✅ Снимки ушли на голосование');
+  };
+
+  return (
+    <div className="stack today-stack">
+      {vote?.available && vote.photo && (
+        <VoteCard
+          key={`${vote.photo.photoUserId}:${vote.photo.itemIdx}`}
+          vote={vote}
+          act={act}
+        />
+      )}
+
+      {hunt.enabled && (
+        <section className="ticket ticket-jade">
+          <div className="ticket-tag">
+            Фотоохота дня · очки = сумма чужих оценок · угар дня +{hunt.funnyBonus}
+          </div>
+          {!hunt.started ? (
+            <>
+              <p className="hint">
+                Новый день — новые задания: два общих и одно, собранное из слов других
+                игроков. В полночь день обнуляется, и задания берутся заново.
+              </p>
+              <button
+                className="btn btn-primary"
+                onClick={() => act(() => api('/hunt/start', { method: 'POST' }), '🎯 Задания на сегодня получены')}
+              >
+                Получить задания на сегодня
+              </button>
+            </>
+          ) : hunt.confirmed ? (
+            <p className="hint">✅ Снимки подтверждены и ушли на оценку. Переснять уже нельзя.</p>
+          ) : (
+            <p className="hint">
+              Три задания на день. Снимок можно менять сколько угодно, пока не нажмёшь «Готово» —
+              после этого он уйдёт на голосование, и чужие оценки станут твоими очками.
+            </p>
+          )}
+
+          {hunt.items.map((it) => (
+            <div key={it.idx} className="hunt-item">
+              <div className="hunt-head">
+                <span className="hunt-text">
+                  {it.personal && <span className="hunt-personal">от игроков</span>}
+                  {it.text ?? 'Ждём слова от других игроков'}
+                </span>
+                {it.text && !hunt.confirmed && (
+                  <button className="btn btn-small" onClick={() => pickShot(it.idx)}>
+                    {it.myUrl ? '🔄 Переснять' : '📸 Снять'}
+                  </button>
+                )}
+              </div>
+              {it.myUrl && (
+                <figure className="hunt-mine">
+                  <img src={it.myUrl} alt={it.text ?? 'Мой снимок'} loading="lazy" />
+                </figure>
+              )}
+            </div>
+          ))}
+
+          {hunt.started && !hunt.confirmed && (
+            <button
+              className="btn btn-primary"
+              disabled={hunt.shotCount === 0}
+              onClick={() => setConfirmDay(true)}
+            >
+              Готово — на голосование ({hunt.shotCount}/{hunt.items.length})
+            </button>
+          )}
+        </section>
+      )}
+
+      {hunt.enabled && !hunt.confirmed && (
+        <section className="ticket ticket-lantern">
+          <div className="ticket-tag">Слова для третьего задания</div>
+          <p className="hint">
+            Сдай прилагательное и существительное — они уйдут другим игрокам, а твоё
+            третье задание соберётся из чужих слов.
+            {hunt.othersWithWords === 0 && ' Пока никто больше слов не сдал — задание появится, когда сдадут.'}
+          </p>
+          <WordsForm key={hunt.date} initial={hunt.myWords} onSave={saveWords} />
+        </section>
+      )}
+
       <input
-        ref={ref}
+        ref={fileRef}
         type="file"
         accept="image/*"
         hidden
         onChange={(e) => {
           const file = e.target.files?.[0];
           e.target.value = '';
-          if (file) onFile(file);
+          if (file) upload(file);
+          else setPending(null);
         }}
       />
-    </>
+
+      {confirmDay && (
+        <ConfirmModal
+          title="Отправить на голосование?"
+          text={`Подтверждаешь ${hunt.shotCount} снимк(ов). После этого переснять будет нельзя, и остальные начнут их оценивать.`}
+          confirmLabel="Да, готово"
+          onConfirm={confirmSubmission}
+          onCancel={() => setConfirmDay(false)}
+        />
+      )}
+    </div>
   );
 }
 
-function TodayTab({ today, hunt, chain, act }) {
-  if (!today) return <div className="loading">Зажигаем фонари…</div>;
+// «Слабо»: список поступков, а не находок. Пересдать фото можно — очки от
+// этого не меняются, а кадр бывает смазанным.
+function DaresTab({ dares, act }) {
+  const fileRef = useRef(null);
+  const [pending, setPending] = useState(null);
 
-  const uploadPhoto = (file) => {
-    const fd = new FormData();
-    fd.append('photo', file);
-    act(() => api('/photos', { method: 'POST', formData: fd }), 'Фото сдано! +5 очков');
+  if (!dares) return <div className="loading">Собираем список…</div>;
+  if (!dares.enabled) {
+    return (
+      <div className="empty">
+        <div className="empty-icon">😤</div>
+        <p>Игра «Слабо» выключена админом.</p>
+      </div>
+    );
+  }
+
+  const pickShot = (id) => {
+    setPending(id);
+    fileRef.current?.click();
   };
 
-  const uploadHunt = (idx) => (file) => {
+  const upload = (file) => {
+    const id = pending;
+    setPending(null);
+    if (!id) return;
     const fd = new FormData();
     fd.append('photo', file);
-    fd.append('item', String(idx));
-    act(() => api('/hunt', { method: 'POST', formData: fd }), `🎯 Добыча засчитана! +${hunt.itemPoints}`);
+    fd.append('dareId', id);
+    act(() => api('/dares', { method: 'POST', formData: fd }), '😤 Засчитано!');
   };
 
   return (
-    <div className="stack today-stack">
+    <div className="stack">
       <section className="ticket ticket-lantern">
-        <div className="ticket-tag">Фото-миссия дня · сдал +5 · голос за твоё +7</div>
-        <h2>{today.mission}</h2>
-        {today.photo.submitted ? (
-          <div className="done-line">✓ Фото сдано. Одна попытка — и она была твоя.</div>
-        ) : (
-          <FileButton label="📸 Сдать фото (одна попытка!)" onFile={uploadPhoto} />
-        )}
-        <p className="hint">Сдано сегодня: {today.photo.count}. Голосование — во вкладке «Фото».</p>
+        <div className="ticket-tag">Слабо · сделано {dares.myDone} · очков {dares.myPoints}</div>
+        <p className="hint">
+          Здесь не высматривают, а делают. Выбери челлендж, выполни по-настоящему
+          и сфоткай доказательство. Чем страшнее — тем дороже.
+        </p>
       </section>
 
-      {hunt?.enabled && hunt.items.length > 0 && (
-        <section className="ticket ticket-jade">
-          <div className="ticket-tag">Фотоохота дня · каждая цель +{hunt.itemPoints}</div>
-          <p className="hint">
-            Это не конкурс красоты — просто найди и докажи фоткой. Три цели на сегодня:
-          </p>
-          {hunt.items.map((it) => (
-            <div key={it.idx} className="hunt-item">
-              <div className="hunt-head">
-                <span className="hunt-text">{it.text}</span>
-                {it.myUrl ? (
-                  <span className="hunt-done">✓ добыто</span>
-                ) : (
-                  <FileButton className="btn btn-small" label="📸 Нашёл!" onFile={uploadHunt(it.idx)} />
-                )}
+      {dares.tiers.map((t) => (
+        <section key={t.tier} className={t.tier === 'extreme' ? 'ticket ticket-brass' : 'ticket ticket-jade'}>
+          <div className="ticket-tag">{t.label} · каждый +{t.points}</div>
+          <p className="hint">{t.hint}</p>
+          {t.items.map((it) => (
+            <div key={it.id} className="dare-item">
+              <div className="dare-head">
+                <span className={it.myUrl ? 'dare-text done' : 'dare-text'}>{it.text}</span>
+                <button className="btn btn-small" onClick={() => pickShot(it.id)}>
+                  {it.myUrl ? '🔄' : '📸 Слабо!'}
+                </button>
               </div>
-              {it.finds.length > 0 && (
-                <div className="hunt-finds">
-                  {it.finds.map((f) => (
-                    <figure key={f.userId} className="hunt-find">
-                      <img src={f.url} alt={`Находка от ${f.name}`} loading="lazy" />
-                      <figcaption>{f.name}</figcaption>
-                    </figure>
-                  ))}
-                </div>
+              <div className="dare-meta">
+                {it.myUrl && <span className="dare-done">✓ твои +{t.points}</span>}
+                {it.doneBy > 0 && <span>взяли: {it.doneBy}</span>}
+              </div>
+              {it.myUrl && (
+                <figure className="dare-shot">
+                  <img src={it.myUrl} alt={it.text} loading="lazy" />
+                </figure>
               )}
             </div>
           ))}
         </section>
-      )}
-
-      {chain?.enabled && (
-        <section className="ticket ticket-brass chain-preview">
-          <div className="ticket-tag">Цепочка чисел · сейчас ищем {chain.next}</div>
-          {chain.lastEntry ? (
-            <LastChainEntry entry={chain.lastEntry} />
-          ) : (
-            <p className="hint">Цепочка ещё не началась — первым нужно найти число 1.</p>
-          )}
-        </section>
-      )}
-    </div>
-  );
-}
-
-function PhotosTab({ gallery, act }) {
-  if (!gallery) return <div className="loading">Проявляем плёнку…</div>;
-  if (gallery.photos.length === 0) {
-    return (
-      <div className="empty">
-        <div className="empty-icon">📭</div>
-        <p>Сегодня ещё никто не сдал фото.<br />Миссия ждёт на вкладке «Сегодня».</p>
-      </div>
-    );
-  }
-  return (
-    <div className="stack">
-      <h2 className="page-title">Галерея дня</h2>
-      <p className="hint center">Голосуй за лучшее: за себя нельзя, голос можно менять. Автору +7 за голос.</p>
-      {gallery.photos.map((p) => (
-        <figure key={p.userId} className="photo-card">
-          <img src={p.url} alt={`Фото от ${p.name}`} loading="lazy" />
-          <figcaption>
-            <span className="photo-author">{p.mine ? `${p.name} (ты)` : p.name}</span>
-            <span className="photo-votes">🔥 {p.votes}</span>
-            {!p.mine && (
-              <button
-                className={gallery.myVoteUserId === p.userId ? 'btn btn-small voted' : 'btn btn-small'}
-                onClick={() => act(() => api('/day/vote-photo', { method: 'POST', body: { targetUserId: p.userId } }), 'Голос учтён')}
-              >
-                {gallery.myVoteUserId === p.userId ? '✓ Твой голос' : 'Голосовать'}
-              </button>
-            )}
-          </figcaption>
-        </figure>
       ))}
+
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/*"
+        hidden
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          e.target.value = '';
+          if (file) upload(file);
+          else setPending(null);
+        }}
+      />
     </div>
   );
 }
 
-function ChainTab({ chain, act }) {
-  if (!chain) return <div className="loading">Считаем до бесконечности…</div>;
-
-  const upload = (file) => {
-    const fd = new FormData();
-    fd.append('photo', file);
-    act(() => api('/chain', { method: 'POST', formData: fd }), `Число ${chain.next} твоё! +${chain.points}`);
-  };
-
-  return (
-    <div className="stack">
-      <section className="ticket ticket-brass chain-hero">
-        <div className="ticket-tag">Цепочка чисел · за число N — +N (макс. +30)</div>
-        <div className="chain-number">{chain.next}</div>
-        <p className="hint">Найди это число вокруг — номер дома, ценник, автобус — и успей первым.</p>
-        {chain.mustSkip ? (
-          <div className="done-line">✋ Ты взял прошлое число — этот ход пропускаешь.</div>
-        ) : (
-          <FileButton label={`📸 Я нашёл ${chain.next}! (+${chain.points})`} onFile={upload} />
-        )}
-        {chain.lastFinder && <p className="hint">Прошлое число забрал(а): {chain.lastFinder.name}</p>}
-        {chain.lastEntry && <LastChainEntry entry={chain.lastEntry} />}
-      </section>
-
-      {chain.entries.length > 0 && (
-        <>
-          <h3 className="page-title">История охоты</h3>
-          <div className="chain-grid">
-            {chain.entries.map((e) => (
-              <figure key={e.n} className="chain-card">
-                <img src={e.url} alt={`Число ${e.n}`} loading="lazy" />
-                <figcaption><b>{e.n}</b> · {e.name} · +{e.points}</figcaption>
-              </figure>
-            ))}
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
-function LastChainEntry({ entry }) {
-  return (
-    <figure className="chain-latest">
-      <div className="chain-latest-photo">
-        <img src={entry.url} alt={`Последнее найденное число ${entry.n}`} loading="lazy" />
-        <span className="chain-latest-number">{entry.n}</span>
-      </div>
-      <figcaption>Последним нашёл(ла): {entry.name}</figcaption>
-    </figure>
-  );
-}
-
-// Форма слов монтируется заново на каждый раунд (key = id раунда),
-// поэтому поллинг не затирает то, что игрок сейчас печатает.
+// Форма монтируется заново на каждый игровой день (key = дата), поэтому
+// поллинг не затирает то, что игрок сейчас печатает.
 function WordsForm({ initial, onSave }) {
   const [adjective, setAdjective] = useState(initial?.adjective ?? '');
   const [noun, setNoun] = useState(initial?.noun ?? '');
@@ -380,190 +605,6 @@ function WordsForm({ initial, onSave }) {
   );
 }
 
-function PhraseCard({ item }) {
-  return (
-    <figure className={item.mine ? 'phrase-card mine' : 'phrase-card'}>
-      <figcaption className="phrase-card-head">
-        <span className="phrase-card-text">{item.adjective} {item.noun}</span>
-        <span className="phrase-card-name">{item.mine ? `${item.name} (ты)` : item.name}</span>
-      </figcaption>
-      {item.url
-        ? <img src={item.url} alt={`${item.adjective} ${item.noun}`} loading="lazy" />
-        : <div className="phrase-card-wait">ещё ищет…</div>}
-    </figure>
-  );
-}
-
-// Архив грузится отдельно от общего поллинга: он меняется редко,
-// а фото прошлых игр тянуть каждые 30 секунд незачем.
-function PhraseHistory({ roundId }) {
-  const [rounds, setRounds] = useState(null);
-
-  useEffect(() => {
-    api('/phrase/history').then((d) => setRounds(d.rounds)).catch(() => setRounds([]));
-  }, [roundId]);
-
-  if (!rounds || rounds.length === 0) return null;
-
-  return (
-    <section className="phrase-past-list">
-      <h3 className="page-title">Прошлые игры</h3>
-      {rounds.map((r) => (
-        <details key={r.id} className="phrase-past">
-          <summary>
-            Игра #{r.id} · {r.date.slice(8, 10)}.{r.date.slice(5, 7)} · {r.photos} из {r.items.length} фото
-          </summary>
-          <div className="phrase-grid">
-            {r.items.map((i) => <PhraseCard key={i.userId} item={i} />)}
-          </div>
-        </details>
-      ))}
-    </section>
-  );
-}
-
-function PhraseTab({ phrase, user, act }) {
-  if (!phrase) return <div className="loading">Тасуем слова…</div>;
-  if (!phrase.enabled) {
-    return (
-      <div className="empty">
-        <div className="empty-icon">🎭</div>
-        <p>Фотофраза выключена админом.</p>
-      </div>
-    );
-  }
-
-  const status = phrase.round?.status ?? null;
-  const ready = phrase.players.length;
-  const done = phrase.assignments.filter((a) => a.url).length;
-
-  const saveWords = (body) =>
-    act(() => api('/phrase/words', { method: 'POST', body }), 'Слова приняты!');
-  const uploadPhoto = (file) => {
-    const fd = new FormData();
-    fd.append('photo', file);
-    act(() => api('/phrase/photo', { method: 'POST', formData: fd }), `🎭 Принято! +${phrase.photoPoints}`);
-  };
-
-  return (
-    <div className="stack">
-      {status === null && (
-        <section className="ticket ticket-lantern phrase-hero">
-          <div className="ticket-tag">Фотофраза · слова +{phrase.wordPoints} · фото +{phrase.photoPoints}</div>
-          <h2>Каждый сдаёт два слова — получает чужие</h2>
-          <p className="hint">
-            Все скидывают по одному прилагательному и одному существительному. На старте слова
-            перемешиваются: тебе достаётся чужая пара, и её надо сфотографировать в реальной жизни.
-          </p>
-          <div className="btn-row">
-            <button className="btn btn-jade" onClick={() => act(() => api('/phrase/round', { method: 'POST' }), 'Раунд открыт — сдавайте слова')}>
-              Открыть раунд
-            </button>
-          </div>
-        </section>
-      )}
-
-      {status === 'collecting' && (
-        <>
-          <section className="ticket ticket-lantern">
-            <div className="ticket-tag">Раунд #{phrase.round.id} · сбор слов · +{phrase.wordPoints}</div>
-            <h2>Два слова от тебя</h2>
-            <p className="hint">
-              Чужие слова скрыты до старта. Загадывай так, чтобы сфоткать было реально — но смешно.
-            </p>
-            <WordsForm key={phrase.round.id} initial={phrase.myWords} onSave={saveWords} />
-          </section>
-
-          <section className="ticket ticket-jade">
-            <div className="ticket-tag">Готовы: {ready} · нужно минимум {phrase.minPlayers}</div>
-            <div className="phrase-players">
-              {phrase.players.map((p) => (
-                <span key={p.userId} className="phrase-player">✓ {p.mine ? `${p.name} (ты)` : p.name}</span>
-              ))}
-              {ready === 0 && <p className="hint">Пока никто не сдал слова.</p>}
-            </div>
-            <div className="btn-row">
-              <button
-                className="btn btn-jade"
-                disabled={ready < phrase.minPlayers}
-                onClick={() => act(() => api('/phrase/start', { method: 'POST' }), '🎲 Слова перемешаны!')}
-              >
-                Начать игру ({ready})
-              </button>
-            </div>
-            {ready < phrase.minPlayers && <p className="hint">Ждём ещё игроков со словами.</p>}
-            {user.isAdmin && (
-              <>
-                <button
-                  className="btn btn-ghost phrase-admin-close"
-                  onClick={() => act(() => api('/phrase/finish', { method: 'POST' }), 'Игра закрыта — можно открыть новую')}
-                >
-                  Закрыть игру, не начиная
-                </button>
-                <p className="hint">Только для админа: сдаться и начать новую игру в другой день.</p>
-              </>
-            )}
-          </section>
-        </>
-      )}
-
-      {status === 'playing' && (
-        <>
-          <section className="ticket ticket-brass phrase-hero">
-            <div className="ticket-tag">Раунд #{phrase.round.id} · твоя фраза · фото +{phrase.photoPoints}</div>
-            {phrase.myAssignment ? (
-              <>
-                <div className="phrase-big">{phrase.myAssignment.adjective}<br />{phrase.myAssignment.noun}</div>
-                <p className="hint">Найди или устрой это в реальной жизни и сфоткай. Одна попытка.</p>
-                {phrase.myAssignment.url ? (
-                  <div className="done-line">✓ Фото сдано. Ждём остальных.</div>
-                ) : (
-                  <FileButton label="📸 Сдать фото" onFile={uploadPhoto} />
-                )}
-              </>
-            ) : (
-              <p className="hint">Ты не успел сдать слова — этот раунд идёт без тебя. Подключайся к следующему.</p>
-            )}
-            <p className="hint">Сдали {done} из {phrase.assignments.length}.</p>
-          </section>
-
-          <div className="phrase-grid">
-            {phrase.assignments.map((a) => <PhraseCard key={a.userId} item={a} />)}
-          </div>
-
-          <button
-            className="btn btn-ghost"
-            onClick={() => act(() => api('/phrase/finish', { method: 'POST' }), 'Раунд закрыт')}
-          >
-            Завершить раунд досрочно
-          </button>
-        </>
-      )}
-
-      {status === 'finished' && (
-        <>
-          <section className="ticket ticket-jade phrase-hero">
-            <div className="ticket-tag">Раунд #{phrase.round.id} · итоги</div>
-            <h2>Раунд сыгран</h2>
-            <p className="hint">Сфоткано {done} из {phrase.assignments.length} фраз.</p>
-            <div className="btn-row">
-              <button className="btn btn-jade" onClick={() => act(() => api('/phrase/round', { method: 'POST' }), 'Новый раунд открыт')}>
-                Новый раунд
-              </button>
-            </div>
-          </section>
-
-          <div className="phrase-grid">
-            {phrase.assignments.map((a) => <PhraseCard key={a.userId} item={a} />)}
-          </div>
-        </>
-      )}
-
-      <PhraseHistory roundId={phrase.round?.id ?? 0} />
-    </div>
-  );
-}
-
 function ConfirmModal({ title, text, confirmLabel, onConfirm, onCancel }) {
   return (
     <div className="modal-backdrop" onClick={onCancel}>
@@ -580,8 +621,11 @@ function ConfirmModal({ title, text, confirmLabel, onConfirm, onCancel }) {
 }
 
 function BingoTab({ bingo, act }) {
-  // Любое изменение клетки — только через подтверждение в модалке.
-  const [confirm, setConfirm] = useState(null); // { cell, word, marked }
+  // Клетку закрывает только фото, поэтому тап по пустой сразу открывает камеру.
+  // Модалка осталась на сбросе — там есть что терять.
+  const fileRef = useRef(null);
+  const [pending, setPending] = useState(null); // клетка, для которой выбирают фото
+  const [viewer, setViewer] = useState(null); // { cell, word, url } — открытый снимок
 
   if (!bingo) return <div className="loading">Раздаём карточки…</div>;
   if (!bingo.enabled) {
@@ -593,13 +637,28 @@ function BingoTab({ bingo, act }) {
     );
   }
 
-  const apply = () => {
-    const { cell, marked } = confirm;
-    setConfirm(null);
+  const pickShot = (cell) => {
+    setPending(cell);
+    fileRef.current?.click();
+  };
+
+  const upload = (file) => {
+    const cell = pending;
+    setPending(null);
+    if (cell === null) return;
+    const fd = new FormData();
+    fd.append('photo', file);
+    fd.append('cell', String(cell));
     act(
-      () => api('/bingo/mark', { method: 'POST', body: { cell, marked: !marked } }),
-      marked ? 'Отметка снята' : '🎯 Есть! Клетка отмечена',
+      () => api('/bingo/cell', { method: 'POST', formData: fd }),
+      `🎯 Есть! Клетка закрыта +${bingo.cellPoints}`,
     );
+  };
+
+  const reset = () => {
+    const { cell } = viewer;
+    setViewer(null);
+    act(() => api(`/bingo/cell/${cell}`, { method: 'DELETE' }), 'Отметка снята, фото удалено');
   };
 
   return (
@@ -609,36 +668,58 @@ function BingoTab({ bingo, act }) {
           Бинго дня · клетка +{bingo.cellPoints} · линия +{bingo.linePoints} · вся карта +{bingo.cardPoints}
         </div>
         <p className="hint">
-          Высмотрел это вокруг — тапни клетку. Подстраивать не считается:
-          сам купил баблти — мимо. Линия — 5 в ряд по горизонтали,
-          вертикали или диагонали.
+          Высмотрел это вокруг — сфоткай, и клетка закроется. Без фото отметки нет.
+          Подстраивать не считается: сам купил баблти — мимо. Линия — 5 в ряд
+          по горизонтали, вертикали или диагонали.
         </p>
         <div className="bingo-grid">
           {bingo.cells.map((c, i) => (
             <button
               key={i}
               className={c.marked ? 'bingo-cell marked' : 'bingo-cell'}
-              onClick={() => setConfirm({ cell: i, word: c.word, marked: c.marked })}
+              onClick={() => (c.marked ? setViewer({ cell: i, word: c.word, url: c.photoUrl }) : pickShot(i))}
             >
-              {c.word}
+              {c.photoUrl && <img className="bingo-shot" src={c.photoUrl} alt="" loading="lazy" />}
+              <span className="bingo-word">{c.word}</span>
             </button>
           ))}
         </div>
         <p className="hint center">
-          Отмечено {bingo.marked}/25 · линий {bingo.lines} · очков за карту {bingo.score}
+          Закрыто {bingo.marked}/25 · линий {bingo.lines} · очков за карту {bingo.score}
         </p>
       </section>
 
-      {confirm && (
-        <ConfirmModal
-          title={confirm.marked ? 'Сбросить отметку?' : 'Отметить клетку?'}
-          text={confirm.marked
-            ? `Снимаем отметку с «${confirm.word}» — очки за неё уйдут.`
-            : `«${confirm.word}» — правда видел это своими глазами? Честность — валюта этой игры.`}
-          confirmLabel={confirm.marked ? 'Да, сбросить' : 'Да, подтверждаю'}
-          onConfirm={apply}
-          onCancel={() => setConfirm(null)}
-        />
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/*"
+        hidden
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          e.target.value = '';
+          if (file) upload(file);
+          else setPending(null);
+        }}
+      />
+
+      {/* Сначала показываем сам снимок: сброс — уже осознанное решение,
+          поэтому отдельного «точно?» больше не нужно. */}
+      {viewer && (
+        <div className="modal-backdrop" onClick={() => setViewer(null)}>
+          <div className="shot-viewer" onClick={(e) => e.stopPropagation()}>
+            <h3 className="shot-word">{viewer.word}</h3>
+            {viewer.url && <img className="shot-photo" src={viewer.url} alt={viewer.word} />}
+            <div className="btn-row">
+              <button type="button" className="btn btn-ghost" onClick={() => setViewer(null)}>
+                Закрыть
+              </button>
+              <button type="button" className="btn btn-reset" onClick={reset}>
+                Сбросить
+              </button>
+            </div>
+            <p className="hint center">Сброс удалит фото и снимет очки за клетку.</p>
+          </div>
+        </div>
       )}
     </div>
   );
@@ -723,16 +804,6 @@ function AdminTab({ notify }) {
     <div className="stack">
       <h2 className="page-title">Админка</h2>
       <PoolEditor
-        tag={`Фотомиссия дня — тем в пуле: ${cfg.photo.missions.length}`}
-        items={cfg.photo.missions}
-        busy={busy}
-        placeholder="Тема для фотомиссии дня"
-        warning={cfg.photo.missions.length < 2 ? 'Лучше добавить хотя бы две темы, чтобы миссии менялись.' : null}
-        note="Миссия на сегодня уже выбрана. Изменения пула подействуют со следующего игрового дня."
-        onSave={(missions) => save({ photo: { ...cfg.photo, missions } })}
-        notify={notify}
-      />
-      <PoolEditor
         tag={`Бинго — слов в пуле: ${cfg.bingo.words.length} · нужно минимум 25`}
         items={cfg.bingo.words}
         busy={busy}
@@ -743,20 +814,46 @@ function AdminTab({ notify }) {
         notify={notify}
       />
       <PoolEditor
-        tag={`Фотоохота — целей в пуле: ${cfg.hunt.items.length} · по 3 в день`}
+        tag={`Фотоохота — целей в пуле: ${cfg.hunt.items.length} · по 2 в день`}
         items={cfg.hunt.items}
         busy={busy}
         placeholder="Стёбная цель для охоты"
-        warning={cfg.hunt.items.length < 3 ? 'Нужно минимум 3 цели, иначе список дня будет короче.' : null}
-        note="Сегодняшний список уже зафиксирован — правки пула подействуют со следующего дня."
+        warning={cfg.hunt.items.length < 2 ? 'Нужно минимум 2 цели, иначе список дня будет короче.' : null}
+        note="Третье задание не из пула — оно собирается из слов игроков. Сегодняшний список уже зафиксирован, правки подействуют со следующего дня."
         onSave={(items) => save({ hunt: { ...cfg.hunt, items } })}
+        notify={notify}
+      />
+      <PoolEditor
+        tag={`Слабо · еда — челленджей: ${cfg.dares.food.length} · каждый +${cfg.dares.foodPoints}`}
+        items={cfg.dares.food}
+        busy={busy}
+        placeholder="Что съесть — конкретно, с названием блюда"
+        note="Формулируй проверяемо: «куриные лапки», а не «что-то странное»."
+        onSave={(food) => save({ dares: { ...cfg.dares, food } })}
+        notify={notify}
+      />
+      <PoolEditor
+        tag={`Слабо · кураж — челленджей: ${cfg.dares.courage.length} · каждый +${cfg.dares.couragePoints}`}
+        items={cfg.dares.courage}
+        busy={busy}
+        placeholder="Поступок, на который нужен характер"
+        onSave={(courage) => save({ dares: { ...cfg.dares, courage } })}
+        notify={notify}
+      />
+      <PoolEditor
+        tag={`Слабо · экстрим — челленджей: ${cfg.dares.extreme.length} · каждый +${cfg.dares.extremePoints}`}
+        items={cfg.dares.extreme}
+        busy={busy}
+        placeholder="Аттракцион или высота — с точным названием"
+        note="Уже выполненные челленджи привязаны к тексту: перепишешь формулировку — старое засчитанное отвяжется."
+        onSave={(extreme) => save({ dares: { ...cfg.dares, extreme } })}
         notify={notify}
       />
     </div>
   );
 }
 
-function TopTab({ top, user }) {
+function TopTab({ top, user, hunt, dares }) {
   if (!top) return <div className="loading">Пересчитываем славу…</div>;
   const medals = ['🥇', '🥈', '🥉'];
   return (
@@ -773,8 +870,9 @@ function TopTab({ top, user }) {
         {top.length === 0 && <p className="hint">Пока пусто. Позови банду.</p>}
       </section>
       <p className="hint center">
-        фото +5 · голос за твоё фото +7 · число N +N (до 30) · охота: цель +8 ·
-        бинго: клетка +2, линия +10, вся карта +40 · фразы: слова +3, фото по фразе +12
+        охота: каждая чужая оценка 0–3 идёт тебе в очки · угар дня +{hunt?.funnyBonus ?? 5} ·
+        слабо: {dares?.tiers?.map((t) => `${t.label.toLowerCase()} +${t.points}`).join(', ') ?? 'еда +10, кураж +15, экстрим +25'} ·
+        число N +N (до 30) · бинго: клетка +2, линия +10, вся карта +40
       </p>
     </div>
   );

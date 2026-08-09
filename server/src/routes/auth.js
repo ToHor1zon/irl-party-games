@@ -12,6 +12,11 @@ const ADMIN_NAMES = (process.env.ADMIN_NAMES || '')
   .map((s) => s.trim().toLowerCase())
   .filter(Boolean);
 
+// Служебный PIN: кто заходит с ним — админ, независимо от имени и очереди
+// регистрации. Удобно раздавать права в поездке, но админом станет любой, кто
+// его знает, — если игра выйдет за пределы своих, переопредели через ADMIN_PIN.
+const ADMIN_PIN = process.env.ADMIN_PIN || '0001';
+
 // Единая точка входа: новое имя — регистрация, существующее — логин по PIN.
 router.post('/join', (req, res) => {
   const name = String(req.body?.name ?? '').trim();
@@ -30,7 +35,7 @@ router.post('/join', (req, res) => {
     if (!bcrypt.compareSync(pin, existing.pin_hash))
       return res.status(401).json({ error: 'Имя занято, а PIN не подходит. Ты точно это ты?' });
     let isAdmin = Boolean(existing.is_admin);
-    if (!isAdmin && ADMIN_NAMES.includes(existing.name.toLowerCase())) {
+    if (!isAdmin && (pin === ADMIN_PIN || ADMIN_NAMES.includes(existing.name.toLowerCase()))) {
       db.prepare('UPDATE users SET is_admin = 1 WHERE id = ?').run(existing.id);
       isAdmin = true;
     }
@@ -42,7 +47,7 @@ router.post('/join', (req, res) => {
   }
 
   const isFirst = db.prepare('SELECT COUNT(*) AS c FROM users').get().c === 0;
-  const isAdmin = isFirst || ADMIN_NAMES.includes(name.toLowerCase());
+  const isAdmin = isFirst || pin === ADMIN_PIN || ADMIN_NAMES.includes(name.toLowerCase());
   const info = db.prepare('INSERT INTO users (name, pin_hash, is_admin) VALUES (?, ?, ?)')
     .run(name, bcrypt.hashSync(pin, 10), isAdmin ? 1 : 0);
   const user = { id: info.lastInsertRowid, name, isAdmin };
